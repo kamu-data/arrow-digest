@@ -1,5 +1,9 @@
 # arrow-digest
+
+[![Crates.io](https://img.shields.io/crates/v/arrow-digest.svg)](https://crates.io/crates/arrow-digest)
+
 Unofficial Apache Arrow crate that aims to standardize stable hashing of structured data.
+
 
 ## Motivation
 Today, structured data formats like Parquet are binary-unstable / non-reproducible - writing the same logical data may result in different files on binary level depending on which writer implementation and you use and may vary with each version.
