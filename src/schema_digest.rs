@@ -1,4 +1,4 @@
-use arrow::datatypes::{DataType, TimeUnit};
+use crate::arrow_shim::datatypes::{DataType, TimeUnit};
 use digest::Digest;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -173,6 +173,7 @@ pub(crate) fn hash_data_type<Dig: Digest>(data_type: &DataType, hasher: &mut Dig
             hasher.update(&(*p as u64).to_le_bytes());
             hasher.update(&(*s as u64).to_le_bytes());
         }
+        #[cfg(not(feature = "use-arrow-5"))]
         DataType::Map(..) => unimplemented!(),
     }
 }
@@ -202,6 +203,7 @@ pub(crate) fn get_fixed_size(data_type: &DataType) -> Option<usize> {
         DataType::Union(_) => unimplemented!(),
         DataType::Dictionary(..) => unimplemented!(),
         DataType::Decimal(_, _) => Some(16), // TODO: arrow-rs does not support 256bit decimal
+        #[cfg(not(feature = "use-arrow-5"))]
         DataType::Map(..) => unimplemented!(),
     }
 }

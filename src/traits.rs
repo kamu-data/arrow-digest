@@ -1,4 +1,4 @@
-use arrow::{
+use crate::arrow_shim::{
     array::Array,
     datatypes::{DataType, Schema},
     record_batch::RecordBatch,

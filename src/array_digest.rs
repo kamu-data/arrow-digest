@@ -1,4 +1,4 @@
-use arrow::{
+use crate::arrow_shim::{
     array::{
         Array, BooleanArray, GenericStringArray, LargeStringArray, StringArray,
         StringOffsetSizeTrait,
@@ -146,7 +146,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
 mod tests {
     use super::*;
 
-    use arrow::{
+    use crate::arrow_shim::{
         array::{ArrayData, BooleanArray, Int32Array, StringArray, UInt32Array},
         buffer::Buffer,
     };
@@ -185,21 +185,30 @@ mod tests {
 
     #[test]
     fn test_bool_array() {
-        let array1 = BooleanArray::from(
-            ArrayData::builder(DataType::Boolean)
-                .len(6)
-                .add_buffer(Buffer::from(vec![0b0011_0101u8]))
-                .build()
-                .unwrap(),
-        );
+        fn make_bool_array(data: Vec<u8>, len: usize, nulls: Option<Vec<u8>>) -> BooleanArray {
+            let builder = ArrayData::builder(DataType::Boolean)
+                .len(len)
+                .add_buffer(Buffer::from(data));
 
-        let array2 = BooleanArray::from(
-            ArrayData::builder(DataType::Boolean)
-                .len(6)
-                .add_buffer(Buffer::from(vec![0b1111_0101u8]))
-                .build()
-                .unwrap(),
-        );
+            let builder = if let Some(nulls) = nulls {
+                builder.null_bit_buffer(Buffer::from(nulls))
+            } else {
+                builder
+            };
+
+            #[cfg(feature = "use-arrow-6")]
+            {
+                BooleanArray::from(builder.build().unwrap())
+            }
+
+            #[cfg(feature = "use-arrow-5")]
+            {
+                BooleanArray::from(builder.build())
+            }
+        }
+
+        let array1 = make_bool_array(vec![0b0011_0101u8], 6, None);
+        let array2 = make_bool_array(vec![0b1111_0101u8], 6, None);
 
         assert_eq!(
             ArrayDigestV0::<Sha3_256>::digest(&array1),
@@ -227,14 +236,7 @@ mod tests {
             ArrayDigestV0::<Sha3_256>::digest(&array2),
         );
 
-        let array3 = BooleanArray::from(
-            ArrayData::builder(DataType::Boolean)
-                .len(6)
-                .add_buffer(Buffer::from(vec![0b1111_0101u8]))
-                .null_bit_buffer(Buffer::from(vec![0b1110_1110]))
-                .build()
-                .unwrap(),
-        );
+        let array3 = make_bool_array(vec![0b1111_0101u8], 6, Some(vec![0b1110_1110]));
 
         assert_eq!(
             ArrayDigestV0::<Sha3_256>::digest(&array3),

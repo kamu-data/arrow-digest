@@ -1,4 +1,4 @@
-use arrow::{datatypes::Schema, record_batch::RecordBatch};
+use crate::arrow_shim::{datatypes::Schema, record_batch::RecordBatch};
 use digest::{Digest, Output, OutputSizeUser};
 
 use crate::{ArrayDigest, ArrayDigestV0, RecordDigest};
@@ -60,7 +60,7 @@ mod tests {
 
     use super::*;
 
-    use arrow::{
+    use crate::arrow_shim::{
         array::{Array, Int32Array, StringArray},
         datatypes::{DataType, Field, Schema},
         record_batch::RecordBatch,

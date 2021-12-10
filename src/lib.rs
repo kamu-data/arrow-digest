@@ -1,4 +1,5 @@
 mod array_digest;
+mod arrow_shim;
 mod record_digest;
 mod schema_digest;
 mod traits;
