@@ -42,6 +42,9 @@ println!("{:x}", digest);
 // Alternatively: Use `.update(&batch)` to hash multiple batches with same schema
 ```
 
+## Status
+While we're working towards `v1` we reserve the right to break the hash stability. Create an issue if you're planning to use this crate.
+
 ## Design Goals
 - Be reasonably fast
 - Same hash no matter how many batches the input was split into
@@ -58,17 +61,20 @@ println!("{:x}", digest);
 Starting from primitives and building up:
 
 - **Endinanness** - always assume little endian
-- `{U}Int{8,16,32,64}, Float{16,32,64}` - hashed using their in-memory binary representation
-- `Utf8, LargeUtf8` - hash length (as `u64`) followed by in-memory representation of the string
-  - Empty strings affect the hash - `digest(["foo", "bar"]) != hash(["f", "oobar"])`
+- **Fixed Size Types**
+  - `Int, FloatingPoint, Decimal, Date, Time, Timestamp` - hashed using their in-memory binary representation
+  - `Bool` - hash the individual values as byte-sized values `1` for `false` and `2` for `true`
+- **Variable Size Types**
+  - `Utf8, LargeUtf8` - hash length (as `u64`) followed by in-memory representation of the string
 - **Nullability** - every null value is represented by a `0` (zero) byte
   - Arrays without validity bitmap have same hashes as arrays that do and all items are valid
-- **Boolean Bitmaps** - hash the individual values as byte-sized values `1` for `false` and `2` for `true`
-  - Using `1` and `2` differentiates them from nulls
-- **Array Data** - data in array hashed sequentially using the above rules
-  - Arrays without gaps and null items can be hashed as a single memory slice
-- **Record Batch Data** - every column is hashed independently, hashes of individual columns are then combined together into the final digest
-- **Schema** - at the start of the process every column hashes its data type according to the following rules
+- **Array Data**
+  - Hash data type according to the table below
+  - Hash items sequentially using the above rules
+- **Record Batch Data**
+  - For every field hash `filed_name as utf8`, `nesting_level (zero-based) as u64` traversing in depth-first order
+  - Arrays of every leaf column are then hashed independently using above rules
+  - Digests of every array are fed into the first hasher to produce the final digest
 
 | Type (in `Schema.fb`) | TypeID (as `u16`) | Followed by                                           |
 | --------------------- | :---------------: | ----------------------------------------------------- |

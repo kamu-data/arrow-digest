@@ -1,4 +1,8 @@
-use crate::arrow_shim::{datatypes::Schema, record_batch::RecordBatch};
+use crate::arrow_shim::{
+    array::{ArrayRef, StructArray},
+    datatypes::{DataType, Field, Schema},
+    record_batch::RecordBatch,
+};
 use digest::{Digest, Output, OutputSizeUser};
 
 use crate::{ArrayDigest, ArrayDigestV0, RecordDigest};
@@ -7,6 +11,7 @@ use crate::{ArrayDigest, ArrayDigestV0, RecordDigest};
 
 pub struct RecordDigestV0<Dig: Digest> {
     columns: Vec<ArrayDigestV0<Dig>>,
+    hasher: Dig,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -22,31 +27,70 @@ impl<Dig: Digest> RecordDigest for RecordDigestV0<Dig> {
         d.finalize()
     }
 
-    // TODO: Support nesting
     fn new(schema: &Schema) -> Self {
+        let mut hasher = Dig::new();
         let mut columns = Vec::new();
 
-        for f in schema.fields() {
-            let data_type = f.data_type();
-            columns.push(ArrayDigestV0::new(data_type));
-        }
+        Self::walk_nested_fields(schema.fields(), 0, &mut |field, level| {
+            hasher.update(&(field.name().len() as u64).to_le_bytes());
+            hasher.update(field.name().as_bytes());
+            hasher.update(&(level as u64).to_le_bytes());
 
-        Self { columns }
+            match field.data_type() {
+                DataType::Struct(_) => (),
+                _ => columns.push(ArrayDigestV0::new(field.data_type())),
+            }
+        });
+
+        Self { columns, hasher }
     }
 
     fn update(&mut self, batch: &RecordBatch) {
-        for (array, digest) in batch.columns().iter().zip(self.columns.iter_mut()) {
-            digest.update(array.as_ref());
+        let mut col_index = 0;
+        Self::walk_nested_columns(batch.columns().iter(), &mut |array| {
+            let col_digest = &mut self.columns[col_index];
+            col_digest.update(array.as_ref());
+            col_index += 1;
+        });
+    }
+
+    fn finalize(mut self) -> Output<Dig> {
+        for c in self.columns {
+            let column_hash = c.finalize();
+            self.hasher.update(column_hash.as_slice());
+        }
+        self.hasher.finalize()
+    }
+}
+
+impl<Dig: Digest> RecordDigestV0<Dig> {
+    fn walk_nested_fields<'a>(fields: &[Field], level: usize, fun: &mut impl FnMut(&Field, usize)) {
+        for field in fields {
+            match field.data_type() {
+                DataType::Struct(nested_fields) => {
+                    fun(field, level);
+                    Self::walk_nested_fields(nested_fields, level + 1, fun);
+                }
+                _ => fun(field, level),
+            }
         }
     }
 
-    fn finalize(self) -> Output<Dig> {
-        let mut hasher = Dig::new();
-        for c in self.columns {
-            let column_hash = c.finalize();
-            hasher.update(column_hash.as_slice());
+    fn walk_nested_columns<'a>(
+        arrays: impl Iterator<Item = &'a ArrayRef>,
+        fun: &mut impl FnMut(&ArrayRef),
+    ) {
+        for array in arrays {
+            match array.data_type() {
+                DataType::Struct(_) => {
+                    let array = array.as_any().downcast_ref::<StructArray>().unwrap();
+                    for i in 0..array.num_columns() {
+                        Self::walk_nested_columns([array.column(i)].into_iter(), fun);
+                    }
+                }
+                _ => fun(array),
+            }
         }
-        hasher.finalize()
     }
 }
 
@@ -97,6 +141,55 @@ mod tests {
         assert_ne!(
             RecordDigestV0::<Sha3_256>::digest(&record_batch2),
             RecordDigestV0::<Sha3_256>::digest(&record_batch3),
+        );
+    }
+
+    #[test]
+    fn test_batch_nested() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int32, false),
+            Field::new(
+                "b",
+                DataType::Struct(vec![
+                    Field::new("c", DataType::Utf8, false),
+                    Field::new("d", DataType::Int32, false),
+                ]),
+                false,
+            ),
+        ]));
+
+        let a: Arc<dyn Array> = Arc::new(Int32Array::from(vec![1, 2, 3]));
+        let c: Arc<dyn Array> = Arc::new(StringArray::from(vec!["a", "b", "c"]));
+        let d: Arc<dyn Array> = Arc::new(Int32Array::from(vec![3, 2, 1]));
+        let b = Arc::new(StructArray::from(vec![
+            (Field::new("c", DataType::Utf8, false), c),
+            (Field::new("d", DataType::Int32, false), d),
+        ]));
+
+        let record_batch1 = RecordBatch::try_new(schema, vec![a.clone(), b.clone()]).unwrap();
+
+        assert_eq!(
+            RecordDigestV0::<sha3::Sha3_256>::digest(&record_batch1),
+            RecordDigestV0::<sha3::Sha3_256>::digest(&record_batch1),
+        );
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int32, false),
+            Field::new(
+                "bee",
+                DataType::Struct(vec![
+                    Field::new("c", DataType::Utf8, false),
+                    Field::new("d", DataType::Int32, false),
+                ]),
+                false,
+            ),
+        ]));
+
+        let record_batch2 = RecordBatch::try_new(schema, vec![a.clone(), b.clone()]).unwrap();
+
+        assert_ne!(
+            RecordDigestV0::<sha3::Sha3_256>::digest(&record_batch1),
+            RecordDigestV0::<sha3::Sha3_256>::digest(&record_batch2),
         );
     }
 }
