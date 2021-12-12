@@ -1,9 +1,12 @@
-use crate::arrow_shim::{
-    array::{
-        Array, BooleanArray, GenericStringArray, LargeStringArray, StringArray,
-        StringOffsetSizeTrait,
+use crate::{
+    arrow_shim::{
+        array::{
+            Array, BooleanArray, GenericStringArray, LargeStringArray, StringArray,
+            StringOffsetSizeTrait,
+        },
+        datatypes::DataType,
     },
-    datatypes::DataType,
+    bitmap_slice::BitmapSlice,
 };
 use digest::{Digest, Output, OutputSizeUser};
 
@@ -24,7 +27,7 @@ impl<Dig: Digest> OutputSizeUser for ArrayDigestV0<Dig> {
 impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
     fn digest(array: &dyn Array) -> Output<Dig> {
         let mut d = Self::new(array.data_type());
-        d.update(array);
+        d.update(array, None);
         d.finalize()
     }
 
@@ -37,17 +40,34 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
         Self { fixed_size, hasher }
     }
 
-    fn update(&mut self, array: &dyn Array) {
+    fn update(&mut self, array: &dyn Array, parent_null_bitmap: Option<BitmapSlice>) {
         let data_type = array.data_type();
 
+        let combined_null_bitmap = if array.null_count() == 0 {
+            parent_null_bitmap
+        } else {
+            let own = BitmapSlice::from_null_bitmap(array.data()).unwrap();
+            if let Some(parent) = &parent_null_bitmap {
+                Some(&own & parent)
+            } else {
+                Some(own)
+            }
+        };
+
         if self.fixed_size.is_some() {
-            self.hash_fixed_size(array)
+            self.hash_fixed_size(array, combined_null_bitmap)
         } else if *data_type == DataType::Boolean {
-            self.hash_array_bool(array)
+            self.hash_array_bool(array, combined_null_bitmap)
         } else if *data_type == DataType::Utf8 {
-            self.hash_array_string(array.as_any().downcast_ref::<StringArray>().unwrap());
+            self.hash_array_string(
+                array.as_any().downcast_ref::<StringArray>().unwrap(),
+                combined_null_bitmap,
+            );
         } else if *data_type == DataType::LargeUtf8 {
-            self.hash_array_string(array.as_any().downcast_ref::<LargeStringArray>().unwrap());
+            self.hash_array_string(
+                array.as_any().downcast_ref::<LargeStringArray>().unwrap(),
+                combined_null_bitmap,
+            );
         } else {
             unimplemented!("Type {} is not yet supported", data_type);
         }
@@ -63,75 +83,90 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
 impl<Dig: Digest> ArrayDigestV0<Dig> {
     const NULL_MARKER: [u8; 1] = [0];
 
-    fn hash_fixed_size(&mut self, array: &dyn Array) {
+    fn hash_fixed_size(&mut self, array: &dyn Array, null_bitmap: Option<BitmapSlice>) {
         let item_size = self.fixed_size.unwrap();
 
         // Ensure single buffer
-        assert_eq!(array.data().buffers().len(), 1);
+        assert_eq!(
+            array.data().buffers().len(),
+            1,
+            "Multiple buffers on a primitive type array"
+        );
 
         let buf = &array.data().buffers()[0];
 
         // Ensure no padding
-        assert_eq!(array.len() * item_size, buf.len());
+        assert_eq!(array.len() * item_size, buf.len(), "Unexpected padding");
 
-        if array.null_count() == 0 {
-            // In case of no nulls we can hash the whole buffer in one go
-            let slice = buf.as_slice();
-            self.hasher.update(slice);
-        } else {
-            // Otherwise have to go element-by-element
-            let slice = buf.as_slice();
-            let bitmap = array.data().null_bitmap().as_ref().unwrap();
-            for i in 0..array.len() {
-                if bitmap.is_set(i) {
-                    let pos = i * item_size;
-                    self.hasher.update(&slice[pos..pos + item_size]);
-                } else {
-                    self.hasher.update(&Self::NULL_MARKER);
+        match null_bitmap {
+            None => {
+                // In case of no nulls we can hash the whole buffer in one go
+                let slice = buf.as_slice();
+                self.hasher.update(slice);
+            }
+            Some(null_bitmap) => {
+                // Otherwise have to go element-by-element
+                let slice = buf.as_slice();
+                for i in 0..array.len() {
+                    if null_bitmap.is_set(i) {
+                        let pos = i * item_size;
+                        self.hasher.update(&slice[pos..pos + item_size]);
+                    } else {
+                        self.hasher.update(&Self::NULL_MARKER);
+                    }
                 }
             }
         }
     }
 
-    // TODO: Speed up
-    fn hash_array_bool(&mut self, array: &dyn Array) {
+    // TODO: PERF: Hashing bool bitmaps is expensive because we have to deal with offsets
+    fn hash_array_bool(&mut self, array: &dyn Array, null_bitmap: Option<BitmapSlice>) {
         let bool_array = array.as_any().downcast_ref::<BooleanArray>().unwrap();
 
-        if bool_array.null_count() == 0 {
-            for i in 0..bool_array.len() {
-                // Safety: boundary check is right above
-                let value = unsafe { bool_array.value_unchecked(i) };
-                self.hasher.update(&[value as u8 + 1]);
-            }
-        } else {
-            for i in 0..bool_array.len() {
-                if bool_array.is_valid(i) {
+        match null_bitmap {
+            None => {
+                for i in 0..bool_array.len() {
                     // Safety: boundary check is right above
                     let value = unsafe { bool_array.value_unchecked(i) };
                     self.hasher.update(&[value as u8 + 1]);
-                } else {
-                    self.hasher.update(&Self::NULL_MARKER);
+                }
+            }
+            Some(null_bitmap) => {
+                for i in 0..bool_array.len() {
+                    if null_bitmap.is_set(i) {
+                        // Safety: boundary check is right above
+                        let value = unsafe { bool_array.value_unchecked(i) };
+                        self.hasher.update(&[value as u8 + 1]);
+                    } else {
+                        self.hasher.update(&Self::NULL_MARKER);
+                    }
                 }
             }
         }
     }
 
-    fn hash_array_string<Off: StringOffsetSizeTrait>(&mut self, array: &GenericStringArray<Off>) {
-        if array.null_count() == 0 {
-            for i in 0..array.len() {
-                let s = array.value(i);
-                self.hasher.update(&(s.len() as u64).to_le_bytes());
-                self.hasher.update(s.as_bytes());
-            }
-        } else {
-            let bitmap = array.data().null_bitmap().as_ref().unwrap();
-            for i in 0..array.len() {
-                if bitmap.is_set(i) {
+    fn hash_array_string<Off: StringOffsetSizeTrait>(
+        &mut self,
+        array: &GenericStringArray<Off>,
+        null_bitmap: Option<BitmapSlice>,
+    ) {
+        match null_bitmap {
+            None => {
+                for i in 0..array.len() {
                     let s = array.value(i);
                     self.hasher.update(&(s.len() as u64).to_le_bytes());
                     self.hasher.update(s.as_bytes());
-                } else {
-                    self.hasher.update(&Self::NULL_MARKER);
+                }
+            }
+            Some(null_bitmap) => {
+                for i in 0..array.len() {
+                    if null_bitmap.is_set(i) {
+                        let s = array.value(i);
+                        self.hasher.update(&(s.len() as u64).to_le_bytes());
+                        self.hasher.update(s.as_bytes());
+                    } else {
+                        self.hasher.update(&Self::NULL_MARKER);
+                    }
                 }
             }
         }

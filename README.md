@@ -45,6 +45,18 @@ println!("{:x}", digest);
 ## Status
 While we're working towards `v1` we reserve the right to break the hash stability. Create an issue if you're planning to use this crate.
 
+- [x] Schema hashing
+- [x] Fixed size types
+- [x] Nullability: primitive types  
+- [x] Uft8 variants
+- [x] Nested structs
+- [x] Nullability: nested structs  
+- [ ] Binaries
+- [ ] Intervals
+- [ ] Unions, Lists, Maps
+- [ ] Metadata endianness check
+- [ ] Better test coverage + fuzzing
+
 ## Design Goals
 - Be reasonably fast
 - Same hash no matter how many batches the input was split into
@@ -69,12 +81,14 @@ Starting from primitives and building up:
 - **Nullability** - every null value is represented by a `0` (zero) byte
   - Arrays without validity bitmap have same hashes as arrays that do and all items are valid
 - **Array Data**
-  - Hash data type according to the table below
+  - *(once per hashing session)* Hash data type according to the table below
   - Hash items sequentially using the above rules
 - **Record Batch Data**
-  - For every field hash `filed_name as utf8`, `nesting_level (zero-based) as u64` traversing in depth-first order
-  - Arrays of every leaf column are then hashed independently using above rules
-  - Digests of every array are fed into the first hasher to produce the final digest
+  - *(once per hashing session)* For every field hash `filed_name as utf8`, `nesting_level (zero-based) as u64` recursively traversing the schema in the **depth-first** order
+  - For every leaf column:
+    - Produce a **combined nullability bitmap** from nullability of every parent
+    - Update corresponding column's hasher using above rules
+  - *(final step)* Digests of every array are fed into the combined hasher to produce the final digest
 
 | Type (in `Schema.fb`) | TypeID (as `u16`) | Followed by                                           |
 | --------------------- | :---------------: | ----------------------------------------------------- |
@@ -113,13 +127,6 @@ Note that some types (`Utf8` and `LargeUtf8`, `Binary` `FixedSizeBinary` and `La
 | MILLISECOND               |           1           |
 | MICROSECOND               |           2           |
 | NANOSECOND                |           3           |
-
-## TODO
-- Metadata endianness check
-- Schema should be part of the hash to exclude manipulation of representation (e.g. changing `decimal` precision)
-- Support nested data
-- Support lists
-- Fuzzing
 
 ## References
 - [Arrow memory layout](https://arrow.apache.org/docs/format/Columnar.html#physical-memory-layout)

@@ -1,8 +1,12 @@
-use crate::arrow_shim::{
-    array::{ArrayRef, StructArray},
-    datatypes::{DataType, Field, Schema},
-    record_batch::RecordBatch,
+use crate::{
+    arrow_shim::{
+        array::{ArrayRef, StructArray},
+        datatypes::{DataType, Field, Schema},
+        record_batch::RecordBatch,
+    },
+    bitmap_slice::BitmapSlice,
 };
+use arrow_6::array::Array;
 use digest::{Digest, Output, OutputSizeUser};
 
 use crate::{ArrayDigest, ArrayDigestV0, RecordDigest};
@@ -47,11 +51,15 @@ impl<Dig: Digest> RecordDigest for RecordDigestV0<Dig> {
 
     fn update(&mut self, batch: &RecordBatch) {
         let mut col_index = 0;
-        Self::walk_nested_columns(batch.columns().iter(), &mut |array| {
-            let col_digest = &mut self.columns[col_index];
-            col_digest.update(array.as_ref());
-            col_index += 1;
-        });
+        Self::walk_nested_columns(
+            batch.columns().iter(),
+            None,
+            &mut |array, parent_null_bitmap| {
+                let col_digest = &mut self.columns[col_index];
+                col_digest.update(array.as_ref(), parent_null_bitmap);
+                col_index += 1;
+            },
+        );
     }
 
     fn finalize(mut self) -> Output<Dig> {
@@ -78,17 +86,34 @@ impl<Dig: Digest> RecordDigestV0<Dig> {
 
     fn walk_nested_columns<'a>(
         arrays: impl Iterator<Item = &'a ArrayRef>,
-        fun: &mut impl FnMut(&ArrayRef),
+        parent_null_bitmap: Option<BitmapSlice>,
+        fun: &mut impl FnMut(&ArrayRef, Option<BitmapSlice>),
     ) {
         for array in arrays {
             match array.data_type() {
                 DataType::Struct(_) => {
                     let array = array.as_any().downcast_ref::<StructArray>().unwrap();
+
+                    let combined_null_bitmap = if array.null_count() == 0 {
+                        parent_null_bitmap.clone()
+                    } else {
+                        let own = BitmapSlice::from_null_bitmap(array.data()).unwrap();
+                        if let Some(parent) = &parent_null_bitmap {
+                            Some(&own & parent)
+                        } else {
+                            Some(own)
+                        }
+                    };
+
                     for i in 0..array.num_columns() {
-                        Self::walk_nested_columns([array.column(i)].into_iter(), fun);
+                        Self::walk_nested_columns(
+                            [array.column(i)].into_iter(),
+                            combined_null_bitmap.clone(),
+                            fun,
+                        );
                     }
                 }
-                _ => fun(array),
+                _ => fun(array, parent_null_bitmap.clone()),
             }
         }
     }
@@ -106,6 +131,7 @@ mod tests {
 
     use crate::arrow_shim::{
         array::{Array, Int32Array, StringArray},
+        buffer::Buffer,
         datatypes::{DataType, Field, Schema},
         record_batch::RecordBatch,
     };
@@ -162,8 +188,8 @@ mod tests {
         let c: Arc<dyn Array> = Arc::new(StringArray::from(vec!["a", "b", "c"]));
         let d: Arc<dyn Array> = Arc::new(Int32Array::from(vec![3, 2, 1]));
         let b = Arc::new(StructArray::from(vec![
-            (Field::new("c", DataType::Utf8, false), c),
-            (Field::new("d", DataType::Int32, false), d),
+            (Field::new("c", DataType::Utf8, false), c.clone()),
+            (Field::new("d", DataType::Int32, false), d.clone()),
         ]));
 
         let record_batch1 = RecordBatch::try_new(schema, vec![a.clone(), b.clone()]).unwrap();
@@ -173,6 +199,7 @@ mod tests {
             RecordDigestV0::<sha3::Sha3_256>::digest(&record_batch1),
         );
 
+        // Different column name
         let schema = Arc::new(Schema::new(vec![
             Field::new("a", DataType::Int32, false),
             Field::new(
@@ -190,6 +217,52 @@ mod tests {
         assert_ne!(
             RecordDigestV0::<sha3::Sha3_256>::digest(&record_batch1),
             RecordDigestV0::<sha3::Sha3_256>::digest(&record_batch2),
+        );
+
+        // Nullability - equal
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int32, false),
+            Field::new(
+                "b",
+                DataType::Struct(vec![
+                    Field::new("c", DataType::Utf8, false),
+                    Field::new("d", DataType::Int32, false),
+                ]),
+                true,
+            ),
+        ]));
+
+        let b = Arc::new(StructArray::from((
+            vec![
+                (Field::new("c", DataType::Utf8, false), c.clone()),
+                (Field::new("d", DataType::Int32, false), d.clone()),
+            ],
+            Buffer::from([0b111]),
+        )));
+
+        let record_batch3 =
+            RecordBatch::try_new(schema.clone(), vec![a.clone(), b.clone()]).unwrap();
+
+        assert_eq!(
+            RecordDigestV0::<sha3::Sha3_256>::digest(&record_batch1),
+            RecordDigestV0::<sha3::Sha3_256>::digest(&record_batch3),
+        );
+
+        // Nullability - not equal
+        let b = Arc::new(StructArray::from((
+            vec![
+                (Field::new("c", DataType::Utf8, false), c.clone()),
+                (Field::new("d", DataType::Int32, false), d.clone()),
+            ],
+            Buffer::from([0b101]),
+        )));
+
+        let record_batch4 =
+            RecordBatch::try_new(schema.clone(), vec![a.clone(), b.clone()]).unwrap();
+
+        assert_ne!(
+            RecordDigestV0::<sha3::Sha3_256>::digest(&record_batch1),
+            RecordDigestV0::<sha3::Sha3_256>::digest(&record_batch4),
         );
     }
 }
