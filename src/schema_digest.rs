@@ -21,7 +21,7 @@ pub(crate) enum TypeID {
     Struct = 12,
     Union = 13,
     FixedSizeBinary = 14,
-    FixedSizeList = 15,
+    //FixedSizeList = 11,
     Map = 16,
     Duration = 17,
     //LargeBinary = 3,
@@ -160,8 +160,9 @@ pub(crate) fn hash_data_type<Dig: Digest>(data_type: &DataType, hasher: &mut Dig
         DataType::Utf8 | DataType::LargeUtf8 => {
             hasher.update(&(TypeID::Utf8 as u16).to_le_bytes());
         }
-        DataType::List(_) | DataType::FixedSizeList(..) | DataType::LargeList(_) => {
-            unimplemented!()
+        DataType::List(field) | DataType::FixedSizeList(field, _) | DataType::LargeList(field) => {
+            hasher.update(&(TypeID::List as u16).to_le_bytes());
+            hash_data_type(field.data_type(), hasher);
         }
         DataType::Struct(_) => unimplemented!(),
         DataType::Union(_) => unimplemented!(),
@@ -173,36 +174,6 @@ pub(crate) fn hash_data_type<Dig: Digest>(data_type: &DataType, hasher: &mut Dig
             hasher.update(&(*p as u64).to_le_bytes());
             hasher.update(&(*s as u64).to_le_bytes());
         }
-        #[cfg(not(feature = "use-arrow-5"))]
-        DataType::Map(..) => unimplemented!(),
-    }
-}
-
-pub(crate) fn get_fixed_size(data_type: &DataType) -> Option<usize> {
-    match data_type {
-        DataType::Null => unimplemented!(),
-        DataType::Boolean => None,
-        DataType::Int8 | DataType::UInt8 => Some(1),
-        DataType::Int16 | DataType::UInt16 => Some(2),
-        DataType::Int32 | DataType::UInt32 => Some(4),
-        DataType::Int64 | DataType::UInt64 => Some(8),
-        DataType::Float16 => Some(2),
-        DataType::Float32 => Some(4),
-        DataType::Float64 => Some(8),
-        DataType::Timestamp(_, _) => Some(8),
-        DataType::Date32 => Some(4),
-        DataType::Date64 => Some(8),
-        DataType::Time32(_) => Some(4),
-        DataType::Time64(_) => Some(8),
-        DataType::Duration(_) => unimplemented!(),
-        DataType::Interval(_) => unimplemented!(),
-        DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => None,
-        DataType::Utf8 | DataType::LargeUtf8 => None,
-        DataType::List(_) | DataType::FixedSizeList(..) | DataType::LargeList(_) => None,
-        DataType::Struct(_) => unimplemented!(),
-        DataType::Union(_) => unimplemented!(),
-        DataType::Dictionary(..) => unimplemented!(),
-        DataType::Decimal(_, _) => Some(16), // TODO: arrow-rs does not support 256bit decimal
         #[cfg(not(feature = "use-arrow-5"))]
         DataType::Map(..) => unimplemented!(),
     }

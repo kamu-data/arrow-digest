@@ -49,11 +49,16 @@ While we're working towards `v1` we reserve the right to break the hash stabilit
 - [x] Fixed size types
 - [x] Nullability: primitive types  
 - [x] Uft8 variants
+- [x] Structs
 - [x] Nested structs
 - [x] Nullability: nested structs  
+- [x] Lists
+- [ ] Lists of structs
 - [ ] Binaries
+- [ ] Dictionaries
 - [ ] Intervals
-- [ ] Unions, Lists, Maps
+- [ ] Unions
+- [ ] Maps
 - [ ] Metadata endianness check
 - [ ] Better test coverage + fuzzing
 
@@ -103,16 +108,16 @@ Starting from primitives and building up:
 | Time                  |         8         | `bitwidth as u64`, `TimeUnitID`                       |
 | Timestamp             |         9         | `TimeUnitID`, `timeZone as nullable Utf8`             |
 | Interval              |        10         |                                                       |
-| List                  |        11         |                                                       |
+| List                  |        11         | `items data type`                                     |
 | Struct                |        12         |                                                       |
 | Union                 |        13         |                                                       |
 | FixedSizeBinary       |        14         |                                                       |
-| FixedSizeList         |        15         |                                                       |
+| FixedSizeList         |        11         | `items data type`                                     |
 | Map                   |        16         |                                                       |
 | Duration              |        17         |                                                       |
 | LargeBinary           |         3         |                                                       |
 | LargeUtf8             |         4         |                                                       |
-| LargeList             |        11         |                                                       |
+| LargeList             |        11         | `items data type`                                     |
 
 Note that some types (`Utf8` and `LargeUtf8`, `Binary` `FixedSizeBinary` and `LargeBinary`, `List` `FixedSizeList` and `LargeList`) are represented in the hash the same, as the difference between them is purely an encoding concern.
 

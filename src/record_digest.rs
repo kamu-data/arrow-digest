@@ -265,4 +265,29 @@ mod tests {
             RecordDigestV0::<sha3::Sha3_256>::digest(&record_batch4),
         );
     }
+
+    /*
+    #[test]
+    fn test_batch_parquet() {
+        use crate::{RecordDigest, RecordDigestV0};
+        use parquet::arrow::ArrowReader;
+        use parquet::arrow::ParquetFileArrowReader;
+        use parquet::file::reader::SerializedFileReader;
+
+        let file = std::fs::File::open(".priv/data.parquet").unwrap();
+        let parquet_reader = SerializedFileReader::new(file).unwrap();
+        let mut arrow_reader = ParquetFileArrowReader::new(Arc::new(parquet_reader));
+
+        println!("{:?}", arrow_reader.get_schema());
+
+        let mut hasher = RecordDigestV0::<sha3::Sha3_256>::new(&arrow_reader.get_schema().unwrap());
+
+        for res_batch in arrow_reader.get_record_reader(1024).unwrap() {
+            let batch = res_batch.unwrap();
+            hasher.update(&batch);
+        }
+
+        println!("{:x}", hasher.finalize());
+    }
+    */
 }

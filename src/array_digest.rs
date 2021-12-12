@@ -1,7 +1,8 @@
 use crate::{
     arrow_shim::{
         array::{
-            Array, BooleanArray, GenericStringArray, LargeStringArray, StringArray,
+            Array, BooleanArray, FixedSizeListArray, GenericListArray, GenericStringArray,
+            LargeListArray, LargeStringArray, ListArray, OffsetSizeTrait, StringArray,
             StringOffsetSizeTrait,
         },
         datatypes::DataType,
@@ -14,7 +15,6 @@ use crate::ArrayDigest;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 pub struct ArrayDigestV0<Dig: Digest> {
-    fixed_size: Option<usize>,
     hasher: Dig,
 }
 
@@ -34,15 +34,10 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
     fn new(data_type: &DataType) -> Self {
         let mut hasher = Dig::new();
         crate::schema_digest::hash_data_type(data_type, &mut hasher);
-
-        let fixed_size = crate::schema_digest::get_fixed_size(data_type);
-
-        Self { fixed_size, hasher }
+        Self { hasher }
     }
 
     fn update(&mut self, array: &dyn Array, parent_null_bitmap: Option<BitmapSlice>) {
-        let data_type = array.data_type();
-
         let combined_null_bitmap = if array.null_count() == 0 {
             parent_null_bitmap
         } else {
@@ -54,22 +49,69 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
             }
         };
 
-        if self.fixed_size.is_some() {
-            self.hash_fixed_size(array, combined_null_bitmap)
-        } else if *data_type == DataType::Boolean {
-            self.hash_array_bool(array, combined_null_bitmap)
-        } else if *data_type == DataType::Utf8 {
-            self.hash_array_string(
+        let data_type = array.data_type();
+
+        #[inline]
+        fn unsupported(data_type: &DataType) -> ! {
+            unimplemented!("Type {} is not yet supported", data_type);
+        }
+
+        match data_type {
+            DataType::Null => unsupported(data_type),
+            DataType::Boolean => self.hash_array_bool(array, combined_null_bitmap),
+            DataType::Int8 | DataType::UInt8 => {
+                self.hash_fixed_size(array, 1, combined_null_bitmap)
+            }
+            DataType::Int16 | DataType::UInt16 => {
+                self.hash_fixed_size(array, 2, combined_null_bitmap)
+            }
+            DataType::Int32 | DataType::UInt32 => {
+                self.hash_fixed_size(array, 4, combined_null_bitmap)
+            }
+            DataType::Int64 | DataType::UInt64 => {
+                self.hash_fixed_size(array, 8, combined_null_bitmap)
+            }
+            DataType::Float16 => self.hash_fixed_size(array, 2, combined_null_bitmap),
+            DataType::Float32 => self.hash_fixed_size(array, 4, combined_null_bitmap),
+            DataType::Float64 => self.hash_fixed_size(array, 8, combined_null_bitmap),
+            DataType::Timestamp(_, _) => self.hash_fixed_size(array, 8, combined_null_bitmap),
+            DataType::Date32 => self.hash_fixed_size(array, 4, combined_null_bitmap),
+            DataType::Date64 => self.hash_fixed_size(array, 8, combined_null_bitmap),
+            DataType::Time32(_) => self.hash_fixed_size(array, 4, combined_null_bitmap),
+            DataType::Time64(_) => self.hash_fixed_size(array, 8, combined_null_bitmap),
+            DataType::Duration(_) => unsupported(data_type),
+            DataType::Interval(_) => unsupported(data_type),
+            DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => {
+                unsupported(data_type)
+            }
+            DataType::Utf8 => self.hash_array_string(
                 array.as_any().downcast_ref::<StringArray>().unwrap(),
                 combined_null_bitmap,
-            );
-        } else if *data_type == DataType::LargeUtf8 {
-            self.hash_array_string(
+            ),
+            DataType::LargeUtf8 => self.hash_array_string(
                 array.as_any().downcast_ref::<LargeStringArray>().unwrap(),
                 combined_null_bitmap,
-            );
-        } else {
-            unimplemented!("Type {} is not yet supported", data_type);
+            ),
+            DataType::List(_) => self.hash_array_list(
+                array.as_any().downcast_ref::<ListArray>().unwrap(),
+                combined_null_bitmap,
+            ),
+            DataType::LargeList(_) => self.hash_array_list(
+                array.as_any().downcast_ref::<LargeListArray>().unwrap(),
+                combined_null_bitmap,
+            ),
+            DataType::FixedSizeList(..) => self.hash_array_list_fixed(
+                array.as_any().downcast_ref::<FixedSizeListArray>().unwrap(),
+                combined_null_bitmap,
+            ),
+            // TODO: Should structs be handled by array digest to allow use without record hasher?
+            DataType::Struct(_) => panic!("Structs are currently flattened by RecordDigest and cannot be processed by ArrayDigest"),
+            DataType::Union(_) => unsupported(data_type),
+            DataType::Dictionary(..) => unsupported(data_type),
+            // TODO: arrow-rs does not support 256bit decimal
+            DataType::Decimal(_, _) => self.hash_fixed_size(array, 16, combined_null_bitmap),
+            #[cfg(not(feature = "use-arrow-5"))]
+            DataType::Map(..) => unsupported(data_type),
         }
     }
 
@@ -83,9 +125,12 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
 impl<Dig: Digest> ArrayDigestV0<Dig> {
     const NULL_MARKER: [u8; 1] = [0];
 
-    fn hash_fixed_size(&mut self, array: &dyn Array, null_bitmap: Option<BitmapSlice>) {
-        let item_size = self.fixed_size.unwrap();
-
+    fn hash_fixed_size(
+        &mut self,
+        array: &dyn Array,
+        item_size: usize,
+        null_bitmap: Option<BitmapSlice>,
+    ) {
         // Ensure single buffer
         assert_eq!(
             array.data().buffers().len(),
@@ -93,20 +138,19 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
             "Multiple buffers on a primitive type array"
         );
 
-        let buf = &array.data().buffers()[0];
-
-        // Ensure no padding
-        assert_eq!(array.len() * item_size, buf.len(), "Unexpected padding");
+        let slice = {
+            let data_start = array.data().offset() * item_size;
+            let data_end = data_start + array.data().len() * item_size;
+            &array.data().buffers()[0].as_slice()[data_start..data_end]
+        };
 
         match null_bitmap {
             None => {
                 // In case of no nulls we can hash the whole buffer in one go
-                let slice = buf.as_slice();
                 self.hasher.update(slice);
             }
             Some(null_bitmap) => {
                 // Otherwise have to go element-by-element
-                let slice = buf.as_slice();
                 for i in 0..array.len() {
                     if null_bitmap.is_set(i) {
                         let pos = i * item_size;
@@ -171,6 +215,60 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
             }
         }
     }
+
+    fn hash_array_list<Off: OffsetSizeTrait>(
+        &mut self,
+        array: &GenericListArray<Off>,
+        null_bitmap: Option<BitmapSlice>,
+    ) {
+        match null_bitmap {
+            None => {
+                for i in 0..array.len() {
+                    let sub_array = array.value(i);
+                    self.hasher.update(&(sub_array.len() as u64).to_le_bytes());
+                    self.update(sub_array.as_ref(), None);
+                }
+            }
+            Some(null_bitmap) => {
+                for i in 0..array.len() {
+                    if null_bitmap.is_set(i) {
+                        let sub_array = array.value(i);
+                        self.hasher.update(&(sub_array.len() as u64).to_le_bytes());
+                        self.update(sub_array.as_ref(), None);
+                    } else {
+                        self.hasher.update(&Self::NULL_MARKER);
+                    }
+                }
+            }
+        }
+    }
+
+    fn hash_array_list_fixed(
+        &mut self,
+        array: &FixedSizeListArray,
+        null_bitmap: Option<BitmapSlice>,
+    ) {
+        match null_bitmap {
+            None => {
+                for i in 0..array.len() {
+                    let sub_array = array.value(i);
+                    self.hasher.update(&(sub_array.len() as u64).to_le_bytes());
+                    self.update(sub_array.as_ref(), None);
+                }
+            }
+            Some(null_bitmap) => {
+                for i in 0..array.len() {
+                    if null_bitmap.is_set(i) {
+                        let sub_array = array.value(i);
+                        self.hasher.update(&(sub_array.len() as u64).to_le_bytes());
+                        self.update(sub_array.as_ref(), None);
+                    } else {
+                        self.hasher.update(&Self::NULL_MARKER);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -184,6 +282,7 @@ mod tests {
     use crate::arrow_shim::{
         array::{ArrayData, BooleanArray, Int32Array, StringArray, UInt32Array},
         buffer::Buffer,
+        datatypes::Int32Type,
     };
     use sha3::Sha3_256;
 
@@ -315,6 +414,68 @@ mod tests {
                 None,
                 Some("baz")
             ]),),
+        );
+    }
+
+    #[test]
+    fn test_list_array() {
+        assert_eq!(
+            ArrayDigestV0::<Sha3_256>::digest(&ListArray::from_iter_primitive::<Int32Type, _, _>(
+                vec![
+                    Some(vec![Some(0), Some(1), Some(2)]),
+                    None,
+                    Some(vec![Some(3), None, Some(4), Some(5)]),
+                    Some(vec![Some(6), Some(7)]),
+                ]
+            )),
+            ArrayDigestV0::<Sha3_256>::digest(&ListArray::from_iter_primitive::<Int32Type, _, _>(
+                vec![
+                    Some(vec![Some(0), Some(1), Some(2)]),
+                    None,
+                    Some(vec![Some(3), None, Some(4), Some(5)]),
+                    Some(vec![Some(6), Some(7)]),
+                ]
+            )),
+        );
+
+        // Different primitive value
+        assert_ne!(
+            ArrayDigestV0::<Sha3_256>::digest(&ListArray::from_iter_primitive::<Int32Type, _, _>(
+                vec![
+                    Some(vec![Some(0), Some(1), Some(2)]),
+                    None,
+                    Some(vec![Some(3), None, Some(4), Some(5)]),
+                    Some(vec![Some(6), Some(7)]),
+                ]
+            )),
+            ArrayDigestV0::<Sha3_256>::digest(&ListArray::from_iter_primitive::<Int32Type, _, _>(
+                vec![
+                    Some(vec![Some(0), Some(1), Some(2)]),
+                    None,
+                    Some(vec![Some(3), None, Some(4), Some(100)]),
+                    Some(vec![Some(6), Some(7)]),
+                ]
+            )),
+        );
+
+        // Value slides to the next list
+        assert_ne!(
+            ArrayDigestV0::<Sha3_256>::digest(&ListArray::from_iter_primitive::<Int32Type, _, _>(
+                vec![
+                    Some(vec![Some(0), Some(1), Some(2)]),
+                    None,
+                    Some(vec![Some(3), None, Some(4), Some(5)]),
+                    Some(vec![Some(6), Some(7)]),
+                ]
+            )),
+            ArrayDigestV0::<Sha3_256>::digest(&ListArray::from_iter_primitive::<Int32Type, _, _>(
+                vec![
+                    Some(vec![Some(0), Some(1), Some(2)]),
+                    None,
+                    Some(vec![Some(3), None, Some(4)]),
+                    Some(vec![Some(5), Some(6), Some(7)]),
+                ]
+            )),
         );
     }
 }
