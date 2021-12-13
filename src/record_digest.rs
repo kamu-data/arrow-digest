@@ -1,12 +1,11 @@
 use crate::{
     arrow_shim::{
-        array::{ArrayRef, StructArray},
+        array::{Array, ArrayRef, StructArray},
         datatypes::{DataType, Field, Schema},
         record_batch::RecordBatch,
     },
     bitmap_slice::BitmapSlice,
 };
-use arrow_6::array::Array;
 use digest::{Digest, Output, OutputSizeUser};
 
 use crate::{ArrayDigest, ArrayDigestV0, RecordDigest};

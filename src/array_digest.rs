@@ -596,13 +596,24 @@ mod tests {
 
         assert_eq!(
             ArrayDigestV0::<Sha3_256>::digest(&BinaryArray::from_vec(vec![b"one", b"two"])),
-            ArrayDigestV0::<Sha3_256>::digest(&FixedSizeBinaryArray::from(
-                ArrayData::builder(DataType::FixedSizeBinary(3))
-                    .len(2)
-                    .add_buffer(Buffer::from(b"onetwo"))
-                    .build()
-                    .unwrap()
-            )),
+            ArrayDigestV0::<Sha3_256>::digest(&FixedSizeBinaryArray::from({
+                #[cfg(feature = "use-arrow-6")]
+                {
+                    ArrayData::builder(DataType::FixedSizeBinary(3))
+                        .len(2)
+                        .add_buffer(Buffer::from(b"onetwo"))
+                        .build()
+                        .unwrap()
+                }
+
+                #[cfg(feature = "use-arrow-5")]
+                {
+                    ArrayData::builder(DataType::FixedSizeBinary(3))
+                        .len(2)
+                        .add_buffer(Buffer::from(b"onetwo"))
+                        .build()
+                }
+            })),
         );
     }
 }
