@@ -1,9 +1,10 @@
 use crate::{
     arrow_shim::{
         array::{
-            Array, BooleanArray, FixedSizeListArray, GenericListArray, GenericStringArray,
-            LargeListArray, LargeStringArray, ListArray, OffsetSizeTrait, StringArray,
-            StringOffsetSizeTrait,
+            Array, BinaryArray, BinaryOffsetSizeTrait, BooleanArray, FixedSizeBinaryArray,
+            FixedSizeListArray, GenericBinaryArray, GenericListArray, GenericStringArray,
+            LargeBinaryArray, LargeListArray, LargeStringArray, ListArray, OffsetSizeTrait,
+            StringArray, StringOffsetSizeTrait,
         },
         datatypes::DataType,
     },
@@ -81,9 +82,21 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
             DataType::Time64(_) => self.hash_fixed_size(array, 8, combined_null_bitmap),
             DataType::Duration(_) => unsupported(data_type),
             DataType::Interval(_) => unsupported(data_type),
-            DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => {
-                unsupported(data_type)
-            }
+            DataType::Binary => self.hash_array_binary(
+                array.as_any().downcast_ref::<BinaryArray>().unwrap(),
+                combined_null_bitmap,
+            ),
+            DataType::LargeBinary => self.hash_array_binary(
+                array.as_any().downcast_ref::<LargeBinaryArray>().unwrap(),
+                combined_null_bitmap,
+            ),
+            DataType::FixedSizeBinary(size) => {
+                self.hash_array_binary_fixed(
+                    array.as_any().downcast_ref::<FixedSizeBinaryArray>().unwrap(),
+                    *size as usize,
+                    combined_null_bitmap,
+                )
+            },
             DataType::Utf8 => self.hash_array_string(
                 array.as_any().downcast_ref::<StringArray>().unwrap(),
                 combined_null_bitmap,
@@ -216,6 +229,61 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
         }
     }
 
+    fn hash_array_binary<Off: BinaryOffsetSizeTrait>(
+        &mut self,
+        array: &GenericBinaryArray<Off>,
+        null_bitmap: Option<BitmapSlice>,
+    ) {
+        match null_bitmap {
+            None => {
+                for i in 0..array.len() {
+                    let slice = array.value(i);
+                    self.hasher.update(&(slice.len() as u64).to_le_bytes());
+                    self.hasher.update(slice);
+                }
+            }
+            Some(null_bitmap) => {
+                for i in 0..array.len() {
+                    if null_bitmap.is_set(i) {
+                        let slice = array.value(i);
+                        self.hasher.update(&(slice.len() as u64).to_le_bytes());
+                        self.hasher.update(slice);
+                    } else {
+                        self.hasher.update(&Self::NULL_MARKER);
+                    }
+                }
+            }
+        }
+    }
+
+    fn hash_array_binary_fixed(
+        &mut self,
+        array: &FixedSizeBinaryArray,
+        size: usize,
+        null_bitmap: Option<BitmapSlice>,
+    ) {
+        match null_bitmap {
+            None => {
+                for i in 0..array.len() {
+                    let slice = array.value(i);
+                    self.hasher.update(&(size as u64).to_le_bytes());
+                    self.hasher.update(slice);
+                }
+            }
+            Some(null_bitmap) => {
+                for i in 0..array.len() {
+                    if null_bitmap.is_set(i) {
+                        let slice = array.value(i);
+                        self.hasher.update(&(size as u64).to_le_bytes());
+                        self.hasher.update(slice);
+                    } else {
+                        self.hasher.update(&Self::NULL_MARKER);
+                    }
+                }
+            }
+        }
+    }
+
     fn hash_array_list<Off: OffsetSizeTrait>(
         &mut self,
         array: &GenericListArray<Off>,
@@ -280,7 +348,10 @@ mod tests {
     use super::*;
 
     use crate::arrow_shim::{
-        array::{ArrayData, BooleanArray, Int32Array, StringArray, UInt32Array},
+        array::{
+            ArrayData, BinaryArray, BooleanArray, FixedSizeBinaryArray, Int32Array, StringArray,
+            UInt32Array,
+        },
         buffer::Buffer,
         datatypes::Int32Type,
     };
@@ -475,6 +546,62 @@ mod tests {
                     Some(vec![Some(3), None, Some(4)]),
                     Some(vec![Some(5), Some(6), Some(7)]),
                 ]
+            )),
+        );
+    }
+
+    #[test]
+    fn test_binary_array() {
+        assert_eq!(
+            ArrayDigestV0::<Sha3_256>::digest(&BinaryArray::from_vec(vec![
+                b"one", b"two", b"", b"three"
+            ])),
+            ArrayDigestV0::<Sha3_256>::digest(&BinaryArray::from_vec(vec![
+                b"one", b"two", b"", b"three"
+            ])),
+        );
+
+        assert_ne!(
+            ArrayDigestV0::<Sha3_256>::digest(&BinaryArray::from_vec(vec![
+                b"one", b"two", b"", b"three"
+            ])),
+            ArrayDigestV0::<Sha3_256>::digest(&BinaryArray::from_vec(vec![
+                b"one", b"two", b"three"
+            ])),
+        );
+
+        assert_eq!(
+            ArrayDigestV0::<Sha3_256>::digest(&BinaryArray::from_vec(vec![
+                b"one", b"two", b"", b"three"
+            ])),
+            ArrayDigestV0::<Sha3_256>::digest(&BinaryArray::from_opt_vec(vec![
+                Some(b"one"),
+                Some(b"two"),
+                Some(b""),
+                Some(b"three")
+            ])),
+        );
+
+        assert_ne!(
+            ArrayDigestV0::<Sha3_256>::digest(&BinaryArray::from_vec(vec![
+                b"one", b"two", b"", b"three"
+            ])),
+            ArrayDigestV0::<Sha3_256>::digest(&BinaryArray::from_opt_vec(vec![
+                Some(b"one"),
+                Some(b"two"),
+                None,
+                Some(b"three")
+            ])),
+        );
+
+        assert_eq!(
+            ArrayDigestV0::<Sha3_256>::digest(&BinaryArray::from_vec(vec![b"one", b"two"])),
+            ArrayDigestV0::<Sha3_256>::digest(&FixedSizeBinaryArray::from(
+                ArrayData::builder(DataType::FixedSizeBinary(3))
+                    .len(2)
+                    .add_buffer(Buffer::from(b"onetwo"))
+                    .build()
+                    .unwrap()
             )),
         );
     }

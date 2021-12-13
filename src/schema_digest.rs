@@ -10,7 +10,10 @@ pub(crate) enum TypeID {
     Int = 1,
     FloatingPoint = 2,
     Binary = 3,
+    // LargeBinary = 3,
+    // FixedSizeBinary = 3,
     Utf8 = 4,
+    // LargeUtf8 = 4,
     Bool = 5,
     Decimal = 6,
     Date = 7,
@@ -18,15 +21,12 @@ pub(crate) enum TypeID {
     Timestamp = 9,
     Interval = 10,
     List = 11,
+    // LargeList = 11,
+    // FixedSizeList = 11,
     Struct = 12,
     Union = 13,
-    FixedSizeBinary = 14,
-    //FixedSizeList = 11,
     Map = 16,
     Duration = 17,
-    //LargeBinary = 3,
-    //LargeUtf8 = 4,
-    //LargeList = 11,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -155,7 +155,7 @@ pub(crate) fn hash_data_type<Dig: Digest>(data_type: &DataType, hasher: &mut Dig
         DataType::Duration(_) => unimplemented!(),
         DataType::Interval(_) => unimplemented!(),
         DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => {
-            unimplemented!()
+            hasher.update(&(TypeID::Binary as u16).to_le_bytes());
         }
         DataType::Utf8 | DataType::LargeUtf8 => {
             hasher.update(&(TypeID::Utf8 as u16).to_le_bytes());

@@ -48,13 +48,13 @@ While we're working towards `v1` we reserve the right to break the hash stabilit
 - [x] Schema hashing
 - [x] Fixed size types
 - [x] Nullability: primitive types  
+- [X] Binaries
 - [x] Uft8 variants
 - [x] Structs
 - [x] Nested structs
 - [x] Nullability: nested structs  
 - [x] Lists
 - [ ] Lists of structs
-- [ ] Binaries
 - [ ] Dictionaries
 - [ ] Intervals
 - [ ] Unions
@@ -82,7 +82,8 @@ Starting from primitives and building up:
   - `Int, FloatingPoint, Decimal, Date, Time, Timestamp` - hashed using their in-memory binary representation
   - `Bool` - hash the individual values as byte-sized values `1` for `false` and `2` for `true`
 - **Variable Size Types**
-  - `Utf8, LargeUtf8` - hash length (as `u64`) followed by in-memory representation of the string
+  - `Binary, LargeBinary, FixedSizeBinary, Utf8, LargeUtf8` - hash length (as `u64`) followed by in-memory representation of the value
+  - `List, LargeList, FixedSizeList` - hash length of the list (as `u64`) followed by the hash of the sub-array list according to its data type
 - **Nullability** - every null value is represented by a `0` (zero) byte
   - Arrays without validity bitmap have same hashes as arrays that do and all items are valid
 - **Array Data**
@@ -111,7 +112,7 @@ Starting from primitives and building up:
 | List                  |        11         | `items data type`                                     |
 | Struct                |        12         |                                                       |
 | Union                 |        13         |                                                       |
-| FixedSizeBinary       |        14         |                                                       |
+| FixedSizeBinary       |         3         |                                                       |
 | FixedSizeList         |        11         | `items data type`                                     |
 | Map                   |        16         |                                                       |
 | Duration              |        17         |                                                       |

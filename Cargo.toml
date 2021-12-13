@@ -1,6 +1,6 @@
 [package]
 name = "arrow-digest"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 repository = "https://github.com/sergiimk/arrow-digest"
 description = "Stable hashes for Apache Arrow."
