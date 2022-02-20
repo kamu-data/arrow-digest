@@ -165,7 +165,7 @@ pub(crate) fn hash_data_type<Dig: Digest>(data_type: &DataType, hasher: &mut Dig
             hash_data_type(field.data_type(), hasher);
         }
         DataType::Struct(_) => unimplemented!(),
-        DataType::Union(_) => unimplemented!(),
+        DataType::Union(_, _) => unimplemented!(),
         DataType::Dictionary(..) => unimplemented!(),
         DataType::Decimal(p, s) => {
             // TODO: arrow-rs does not support 256bit decimal
@@ -174,7 +174,6 @@ pub(crate) fn hash_data_type<Dig: Digest>(data_type: &DataType, hasher: &mut Dig
             hasher.update(&(*p as u64).to_le_bytes());
             hasher.update(&(*s as u64).to_le_bytes());
         }
-        #[cfg(not(feature = "use-arrow-5"))]
         DataType::Map(..) => unimplemented!(),
     }
 }

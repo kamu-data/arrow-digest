@@ -119,11 +119,10 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
             ),
             // TODO: Should structs be handled by array digest to allow use without record hasher?
             DataType::Struct(_) => panic!("Structs are currently flattened by RecordDigest and cannot be processed by ArrayDigest"),
-            DataType::Union(_) => unsupported(data_type),
+            DataType::Union(_, _) => unsupported(data_type),
             DataType::Dictionary(..) => unsupported(data_type),
             // TODO: arrow-rs does not support 256bit decimal
             DataType::Decimal(_, _) => self.hash_fixed_size(array, 16, combined_null_bitmap),
-            #[cfg(not(feature = "use-arrow-5"))]
             DataType::Map(..) => unsupported(data_type),
         }
     }
@@ -401,15 +400,7 @@ mod tests {
                 builder
             };
 
-            #[cfg(feature = "use-arrow-6")]
-            {
-                BooleanArray::from(builder.build().unwrap())
-            }
-
-            #[cfg(feature = "use-arrow-5")]
-            {
-                BooleanArray::from(builder.build())
-            }
+            BooleanArray::from(builder.build().unwrap())
         }
 
         let array1 = make_bool_array(vec![0b0011_0101u8], 6, None);
@@ -596,24 +587,13 @@ mod tests {
 
         assert_eq!(
             ArrayDigestV0::<Sha3_256>::digest(&BinaryArray::from_vec(vec![b"one", b"two"])),
-            ArrayDigestV0::<Sha3_256>::digest(&FixedSizeBinaryArray::from({
-                #[cfg(feature = "use-arrow-6")]
-                {
-                    ArrayData::builder(DataType::FixedSizeBinary(3))
-                        .len(2)
-                        .add_buffer(Buffer::from(b"onetwo"))
-                        .build()
-                        .unwrap()
-                }
-
-                #[cfg(feature = "use-arrow-5")]
-                {
-                    ArrayData::builder(DataType::FixedSizeBinary(3))
-                        .len(2)
-                        .add_buffer(Buffer::from(b"onetwo"))
-                        .build()
-                }
-            })),
+            ArrayDigestV0::<Sha3_256>::digest(&FixedSizeBinaryArray::from(
+                ArrayData::builder(DataType::FixedSizeBinary(3))
+                    .len(2)
+                    .add_buffer(Buffer::from(b"onetwo"))
+                    .build()
+                    .unwrap()
+            )),
         );
     }
 }
