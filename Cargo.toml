@@ -9,9 +9,9 @@ authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 license = "Apache-2.0"
 
 [dependencies]
-digest = "*"
+digest = ">= 0.10.0"
 arrow = { version = "29" }
 
 [dev-dependencies]
-sha3 = "*"
-parquet = "*"
+sha3 = ">= 0.10.0"
+parquet = "29"
