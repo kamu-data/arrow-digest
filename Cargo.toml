@@ -1,6 +1,6 @@
 [package]
 name = "arrow-digest"
-version = "0.7.0"
+version = "29.0.0"
 edition = "2021"
 repository = "https://github.com/sergiimk/arrow-digest"
 description = "Stable hashes for Apache Arrow."
@@ -9,13 +9,9 @@ authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 license = "Apache-2.0"
 
 [dependencies]
-digest = "^0"
-arrow-9 = { package = "arrow", version = "^9", optional = true }
-
-[features]
-default = ["use-arrow-9"]
-use-arrow-9 = ["arrow-9"]
+digest = "*"
+arrow = { version = "29" }
 
 [dev-dependencies]
-sha3 = "^0"
-parquet = "^9"
+sha3 = "*"
+parquet = "*"

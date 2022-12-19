@@ -1,14 +1,11 @@
-use crate::{
-    arrow_shim::{
-        array::{Array, ArrayRef, StructArray},
-        datatypes::{DataType, Field, Schema},
-        record_batch::RecordBatch,
-    },
-    bitmap_slice::BitmapSlice,
+use crate::bitmap_slice::BitmapSlice;
+use crate::{ArrayDigest, ArrayDigestV0, RecordDigest};
+use arrow::{
+    array::{Array, ArrayRef, StructArray},
+    datatypes::{DataType, Field, Schema},
+    record_batch::RecordBatch,
 };
 use digest::{Digest, Output, OutputSizeUser};
-
-use crate::{ArrayDigest, ArrayDigestV0, RecordDigest};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -124,17 +121,15 @@ impl<Dig: Digest> RecordDigestV0<Dig> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use super::*;
-
-    use crate::arrow_shim::{
+    use arrow::{
         array::{Array, Int32Array, StringArray},
         buffer::Buffer,
         datatypes::{DataType, Field, Schema},
         record_batch::RecordBatch,
     };
     use sha3::Sha3_256;
+    use std::sync::Arc;
 
     #[test]
     fn test_batch_mixed() {

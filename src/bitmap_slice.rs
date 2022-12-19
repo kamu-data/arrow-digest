@@ -1,6 +1,5 @@
+use arrow::{array::ArrayData, bitmap::Bitmap};
 use std::ops::BitAnd;
-
-use crate::arrow_shim::{array::ArrayData, bitmap::Bitmap};
 
 /// Similar to `ArrayData` but only holds a bitmap
 #[derive(Debug, Clone)]

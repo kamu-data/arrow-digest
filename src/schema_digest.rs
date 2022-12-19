@@ -1,4 +1,4 @@
-use crate::arrow_shim::datatypes::{DataType, TimeUnit};
+use arrow::datatypes::{DataType, TimeUnit};
 use digest::Digest;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -165,12 +165,17 @@ pub(crate) fn hash_data_type<Dig: Digest>(data_type: &DataType, hasher: &mut Dig
             hash_data_type(field.data_type(), hasher);
         }
         DataType::Struct(_) => unimplemented!(),
-        DataType::Union(_, _) => unimplemented!(),
+        DataType::Union(_, _, _) => unimplemented!(),
         DataType::Dictionary(..) => unimplemented!(),
-        DataType::Decimal(p, s) => {
-            // TODO: arrow-rs does not support 256bit decimal
-            hasher.update(&(TypeID::Utf8 as u16).to_le_bytes());
+        DataType::Decimal128(p, s) => {
+            hasher.update(&(TypeID::Decimal as u16).to_le_bytes());
             hasher.update(&128u64.to_le_bytes());
+            hasher.update(&(*p as u64).to_le_bytes());
+            hasher.update(&(*s as u64).to_le_bytes());
+        }
+        DataType::Decimal256(p, s) => {
+            hasher.update(&(TypeID::Decimal as u16).to_le_bytes());
+            hasher.update(&256u64.to_le_bytes());
             hasher.update(&(*p as u64).to_le_bytes());
             hasher.update(&(*s as u64).to_le_bytes());
         }

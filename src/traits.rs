@@ -1,10 +1,8 @@
-use crate::{
-    arrow_shim::{
-        array::Array,
-        datatypes::{DataType, Schema},
-        record_batch::RecordBatch,
-    },
-    bitmap_slice::BitmapSlice,
+use crate::bitmap_slice::BitmapSlice;
+use arrow::{
+    array::Array,
+    datatypes::{DataType, Schema},
+    record_batch::RecordBatch,
 };
 use digest::{Output, OutputSizeUser};
 

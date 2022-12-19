@@ -1,18 +1,14 @@
-use crate::{
-    arrow_shim::{
-        array::{
-            Array, BinaryArray, BinaryOffsetSizeTrait, BooleanArray, FixedSizeBinaryArray,
-            FixedSizeListArray, GenericBinaryArray, GenericListArray, GenericStringArray,
-            LargeBinaryArray, LargeListArray, LargeStringArray, ListArray, OffsetSizeTrait,
-            StringArray, StringOffsetSizeTrait,
-        },
-        datatypes::DataType,
+use crate::bitmap_slice::BitmapSlice;
+use crate::ArrayDigest;
+use arrow::{
+    array::{
+        Array, BinaryArray, BooleanArray, FixedSizeBinaryArray, FixedSizeListArray,
+        GenericBinaryArray, GenericListArray, GenericStringArray, LargeBinaryArray, LargeListArray,
+        LargeStringArray, ListArray, OffsetSizeTrait, StringArray,
     },
-    bitmap_slice::BitmapSlice,
+    datatypes::DataType,
 };
 use digest::{Digest, Output, OutputSizeUser};
-
-use crate::ArrayDigest;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 pub struct ArrayDigestV0<Dig: Digest> {
@@ -118,11 +114,13 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
                 combined_null_bitmap,
             ),
             // TODO: Should structs be handled by array digest to allow use without record hasher?
-            DataType::Struct(_) => panic!("Structs are currently flattened by RecordDigest and cannot be processed by ArrayDigest"),
-            DataType::Union(_, _) => unsupported(data_type),
+            DataType::Struct(_) => panic!(
+                "Structs are currently flattened by RecordDigest and cannot be processed by ArrayDigest"
+            ),
+            DataType::Union(_, _, _) => unsupported(data_type),
             DataType::Dictionary(..) => unsupported(data_type),
-            // TODO: arrow-rs does not support 256bit decimal
-            DataType::Decimal(_, _) => self.hash_fixed_size(array, 16, combined_null_bitmap),
+            DataType::Decimal128(_, _) => self.hash_fixed_size(array, 16, combined_null_bitmap),
+            DataType::Decimal256(_, _) => self.hash_fixed_size(array, 32, combined_null_bitmap),
             DataType::Map(..) => unsupported(data_type),
         }
     }
@@ -201,9 +199,9 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
         }
     }
 
-    fn hash_array_string<Off: StringOffsetSizeTrait>(
+    fn hash_array_string<OffsetSize: OffsetSizeTrait>(
         &mut self,
-        array: &GenericStringArray<Off>,
+        array: &GenericStringArray<OffsetSize>,
         null_bitmap: Option<BitmapSlice>,
     ) {
         match null_bitmap {
@@ -228,9 +226,9 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
         }
     }
 
-    fn hash_array_binary<Off: BinaryOffsetSizeTrait>(
+    fn hash_array_binary<OffsetSize: OffsetSizeTrait>(
         &mut self,
-        array: &GenericBinaryArray<Off>,
+        array: &GenericBinaryArray<OffsetSize>,
         null_bitmap: Option<BitmapSlice>,
     ) {
         match null_bitmap {
@@ -345,8 +343,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use crate::arrow_shim::{
+    use arrow::{
         array::{
             ArrayData, BinaryArray, BooleanArray, FixedSizeBinaryArray, Int32Array, StringArray,
             UInt32Array,
@@ -395,7 +392,7 @@ mod tests {
                 .add_buffer(Buffer::from(data));
 
             let builder = if let Some(nulls) = nulls {
-                builder.null_bit_buffer(Buffer::from(nulls))
+                builder.null_bit_buffer(Some(Buffer::from(nulls)))
             } else {
                 builder
             };
