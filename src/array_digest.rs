@@ -122,6 +122,7 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
             DataType::Decimal128(_, _) => self.hash_fixed_size(array, 16, combined_null_bitmap),
             DataType::Decimal256(_, _) => self.hash_fixed_size(array, 32, combined_null_bitmap),
             DataType::Map(..) => unsupported(data_type),
+            DataType::RunEndEncoded(..) => unsupported(data_type),
         }
     }
 

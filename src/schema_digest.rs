@@ -180,5 +180,6 @@ pub(crate) fn hash_data_type<Dig: Digest>(data_type: &DataType, hasher: &mut Dig
             hasher.update(&(*s as u64).to_le_bytes());
         }
         DataType::Map(..) => unimplemented!(),
+        DataType::RunEndEncoded(..) => unimplemented!(),
     }
 }
