@@ -1,6 +1,9 @@
 # arrow-digest
 
-[![Crates.io](https://img.shields.io/crates/v/arrow-digest.svg)](https://crates.io/crates/arrow-digest)
+[![Crates.io](https://img.shields.io/crates/v/arrow-digest.svg?style=for-the-badge)](https://crates.io/crates/arrow-digest)
+[![CI](https://img.shields.io/github/actions/workflow/status/sergiimk/arrow-digest/build.yaml?logo=githubactions&label=CI&logoColor=white&style=for-the-badge&branch=master)](https://github.com/sergiimk/arrow-digest/actions)
+[![Dependencies](https://deps.rs/repo/github/sergiimk/arrow-digest/status.svg?&style=for-the-badge)](https://deps.rs/repo/github/kamu-data/kamu-cli)
+
 
 Unofficial Apache Arrow crate that aims to standardize stable hashing of structured data.
 
