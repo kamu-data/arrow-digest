@@ -1,7 +1,7 @@
-use crate::bitmap_slice::BitmapSlice;
 use crate::{ArrayDigest, ArrayDigestV0, RecordDigest};
 use arrow::{
     array::{Array, ArrayRef, StructArray},
+    buffer::NullBuffer,
     datatypes::{DataType, Field, Schema},
     record_batch::RecordBatch,
 };
@@ -82,29 +82,23 @@ impl<Dig: Digest> RecordDigestV0<Dig> {
 
     fn walk_nested_columns<'a>(
         arrays: impl Iterator<Item = &'a ArrayRef>,
-        parent_null_bitmap: Option<BitmapSlice>,
-        fun: &mut impl FnMut(&ArrayRef, Option<BitmapSlice>),
+        parent_null_bitmap: Option<&NullBuffer>,
+        fun: &mut impl FnMut(&ArrayRef, Option<&NullBuffer>),
     ) {
         for array in arrays {
             match array.data_type() {
                 DataType::Struct(_) => {
                     let array = array.as_any().downcast_ref::<StructArray>().unwrap();
 
-                    let combined_null_bitmap = if array.null_count() == 0 {
-                        parent_null_bitmap.clone()
-                    } else {
-                        let own = BitmapSlice::from_null_bitmap(array.data()).unwrap();
-                        if let Some(parent) = &parent_null_bitmap {
-                            Some(&own & parent)
-                        } else {
-                            Some(own)
-                        }
-                    };
+                    let combined_nulls = crate::utils::maybe_combine_null_buffers(
+                        parent_null_bitmap,
+                        array.data().nulls(),
+                    );
 
                     for i in 0..array.num_columns() {
                         Self::walk_nested_columns(
                             [array.column(i)].into_iter(),
-                            combined_null_bitmap.clone(),
+                            combined_nulls.as_option(),
                             fun,
                         );
                     }

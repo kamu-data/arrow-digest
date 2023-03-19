@@ -1,6 +1,6 @@
-use crate::bitmap_slice::BitmapSlice;
 use arrow::{
     array::Array,
+    buffer::NullBuffer,
     datatypes::{DataType, Schema},
     record_batch::RecordBatch,
 };
@@ -16,6 +16,6 @@ pub trait RecordDigest: OutputSizeUser {
 pub trait ArrayDigest: OutputSizeUser {
     fn digest(array: &dyn Array) -> Output<Self>;
     fn new(data_type: &DataType) -> Self;
-    fn update(&mut self, array: &dyn Array, parent_null_bitmap: Option<BitmapSlice>);
+    fn update(&mut self, array: &dyn Array, parent_null_bitmap: Option<&NullBuffer>);
     fn finalize(self) -> Output<Self>;
 }

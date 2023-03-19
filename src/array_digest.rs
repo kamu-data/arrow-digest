@@ -1,4 +1,3 @@
-use crate::bitmap_slice::BitmapSlice;
 use crate::ArrayDigest;
 use arrow::{
     array::{
@@ -6,6 +5,7 @@ use arrow::{
         GenericBinaryArray, GenericListArray, GenericStringArray, LargeBinaryArray, LargeListArray,
         LargeStringArray, ListArray, OffsetSizeTrait, StringArray,
     },
+    buffer::NullBuffer,
     datatypes::DataType,
 };
 use digest::{Digest, Output, OutputSizeUser};
@@ -34,17 +34,10 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
         Self { hasher }
     }
 
-    fn update(&mut self, array: &dyn Array, parent_null_bitmap: Option<BitmapSlice>) {
-        let combined_null_bitmap = if array.null_count() == 0 {
-            parent_null_bitmap
-        } else {
-            let own = BitmapSlice::from_null_bitmap(array.data()).unwrap();
-            if let Some(parent) = &parent_null_bitmap {
-                Some(&own & parent)
-            } else {
-                Some(own)
-            }
-        };
+    fn update(&mut self, array: &dyn Array, parent_null_bitmap: Option<&NullBuffer>) {
+        let combined_null_bitmap_val =
+            crate::utils::maybe_combine_null_buffers(parent_null_bitmap, array.data().nulls());
+        let combined_null_bitmap = combined_null_bitmap_val.as_option();
 
         let data_type = array.data_type();
 
@@ -140,7 +133,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
         &mut self,
         array: &dyn Array,
         item_size: usize,
-        null_bitmap: Option<BitmapSlice>,
+        null_bitmap: Option<&NullBuffer>,
     ) {
         // Ensure single buffer
         assert_eq!(
@@ -163,7 +156,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
             Some(null_bitmap) => {
                 // Otherwise have to go element-by-element
                 for i in 0..array.len() {
-                    if null_bitmap.is_set(i) {
+                    if null_bitmap.is_valid(i) {
                         let pos = i * item_size;
                         self.hasher.update(&slice[pos..pos + item_size]);
                     } else {
@@ -175,7 +168,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
     }
 
     // TODO: PERF: Hashing bool bitmaps is expensive because we have to deal with offsets
-    fn hash_array_bool(&mut self, array: &dyn Array, null_bitmap: Option<BitmapSlice>) {
+    fn hash_array_bool(&mut self, array: &dyn Array, null_bitmap: Option<&NullBuffer>) {
         let bool_array = array.as_any().downcast_ref::<BooleanArray>().unwrap();
 
         match null_bitmap {
@@ -188,7 +181,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
             }
             Some(null_bitmap) => {
                 for i in 0..bool_array.len() {
-                    if null_bitmap.is_set(i) {
+                    if null_bitmap.is_valid(i) {
                         // Safety: boundary check is right above
                         let value = unsafe { bool_array.value_unchecked(i) };
                         self.hasher.update(&[value as u8 + 1]);
@@ -203,7 +196,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
     fn hash_array_string<OffsetSize: OffsetSizeTrait>(
         &mut self,
         array: &GenericStringArray<OffsetSize>,
-        null_bitmap: Option<BitmapSlice>,
+        null_bitmap: Option<&NullBuffer>,
     ) {
         match null_bitmap {
             None => {
@@ -215,7 +208,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
             }
             Some(null_bitmap) => {
                 for i in 0..array.len() {
-                    if null_bitmap.is_set(i) {
+                    if null_bitmap.is_valid(i) {
                         let s = array.value(i);
                         self.hasher.update(&(s.len() as u64).to_le_bytes());
                         self.hasher.update(s.as_bytes());
@@ -230,7 +223,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
     fn hash_array_binary<OffsetSize: OffsetSizeTrait>(
         &mut self,
         array: &GenericBinaryArray<OffsetSize>,
-        null_bitmap: Option<BitmapSlice>,
+        null_bitmap: Option<&NullBuffer>,
     ) {
         match null_bitmap {
             None => {
@@ -242,7 +235,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
             }
             Some(null_bitmap) => {
                 for i in 0..array.len() {
-                    if null_bitmap.is_set(i) {
+                    if null_bitmap.is_valid(i) {
                         let slice = array.value(i);
                         self.hasher.update(&(slice.len() as u64).to_le_bytes());
                         self.hasher.update(slice);
@@ -258,7 +251,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
         &mut self,
         array: &FixedSizeBinaryArray,
         size: usize,
-        null_bitmap: Option<BitmapSlice>,
+        null_bitmap: Option<&NullBuffer>,
     ) {
         match null_bitmap {
             None => {
@@ -270,7 +263,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
             }
             Some(null_bitmap) => {
                 for i in 0..array.len() {
-                    if null_bitmap.is_set(i) {
+                    if null_bitmap.is_valid(i) {
                         let slice = array.value(i);
                         self.hasher.update(&(size as u64).to_le_bytes());
                         self.hasher.update(slice);
@@ -285,7 +278,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
     fn hash_array_list<Off: OffsetSizeTrait>(
         &mut self,
         array: &GenericListArray<Off>,
-        null_bitmap: Option<BitmapSlice>,
+        null_bitmap: Option<&NullBuffer>,
     ) {
         match null_bitmap {
             None => {
@@ -297,7 +290,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
             }
             Some(null_bitmap) => {
                 for i in 0..array.len() {
-                    if null_bitmap.is_set(i) {
+                    if null_bitmap.is_valid(i) {
                         let sub_array = array.value(i);
                         self.hasher.update(&(sub_array.len() as u64).to_le_bytes());
                         self.update(sub_array.as_ref(), None);
@@ -312,7 +305,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
     fn hash_array_list_fixed(
         &mut self,
         array: &FixedSizeListArray,
-        null_bitmap: Option<BitmapSlice>,
+        null_bitmap: Option<&NullBuffer>,
     ) {
         match null_bitmap {
             None => {
@@ -324,7 +317,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
             }
             Some(null_bitmap) => {
                 for i in 0..array.len() {
-                    if null_bitmap.is_set(i) {
+                    if null_bitmap.is_valid(i) {
                         let sub_array = array.value(i);
                         self.hasher.update(&(sub_array.len() as u64).to_le_bytes());
                         self.update(sub_array.as_ref(), None);
@@ -479,6 +472,31 @@ mod tests {
 
     #[test]
     fn test_list_array() {
+        /*let a = ListArray::from_iter_primitive::<Int32Type, _, _>(vec![
+            Some(vec![Some(0), Some(1), Some(2)]),
+            None,
+            Some(vec![Some(3), None, Some(4), Some(5)]),
+            Some(vec![Some(6), Some(7)]),
+        ]);
+
+        let n = a.data().nulls().unwrap();
+        println!(
+            "top level: len {}, offset {}, count {}",
+            n.len(),
+            n.offset(),
+            n.null_count()
+        );
+
+        let sub = a.value(3);
+        let sn = sub.data().nulls().unwrap();
+        println!(
+            "sub level: len {}, offset {}, count {}",
+            sn.len(),
+            sn.offset(),
+            sn.null_count()
+        );
+        return;*/
+
         assert_eq!(
             ArrayDigestV0::<Sha3_256>::digest(&ListArray::from_iter_primitive::<Int32Type, _, _>(
                 vec![
