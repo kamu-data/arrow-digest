@@ -14,4 +14,4 @@ arrow = { version = "36", default-features = false }
 
 [dev-dependencies]
 sha3 = ">= 0.10.0"
-parquet = "36"
+parquet = "37"
