@@ -165,7 +165,7 @@ pub(crate) fn hash_data_type<Dig: Digest>(data_type: &DataType, hasher: &mut Dig
             hash_data_type(field.data_type(), hasher);
         }
         DataType::Struct(_) => unimplemented!(),
-        DataType::Union(_, _, _) => unimplemented!(),
+        DataType::Union(_, _) => unimplemented!(),
         DataType::Dictionary(..) => unimplemented!(),
         DataType::Decimal128(p, s) => {
             hasher.update(&(TypeID::Decimal as u16).to_le_bytes());

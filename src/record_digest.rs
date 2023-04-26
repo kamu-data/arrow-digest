@@ -2,7 +2,7 @@ use crate::{ArrayDigest, ArrayDigestV0, RecordDigest};
 use arrow::{
     array::{Array, ArrayRef, StructArray},
     buffer::NullBuffer,
-    datatypes::{DataType, Field, Schema},
+    datatypes::{DataType, Field, Fields, Schema},
     record_batch::RecordBatch,
 };
 use digest::{Digest, Output, OutputSizeUser};
@@ -68,7 +68,7 @@ impl<Dig: Digest> RecordDigest for RecordDigestV0<Dig> {
 }
 
 impl<Dig: Digest> RecordDigestV0<Dig> {
-    fn walk_nested_fields<'a>(fields: &[Field], level: usize, fun: &mut impl FnMut(&Field, usize)) {
+    fn walk_nested_fields<'a>(fields: &Fields, level: usize, fun: &mut impl FnMut(&Field, usize)) {
         for field in fields {
             match field.data_type() {
                 DataType::Struct(nested_fields) => {
@@ -89,10 +89,11 @@ impl<Dig: Digest> RecordDigestV0<Dig> {
             match array.data_type() {
                 DataType::Struct(_) => {
                     let array = array.as_any().downcast_ref::<StructArray>().unwrap();
+                    let array_data = array.to_data();
 
                     let combined_nulls = crate::utils::maybe_combine_null_buffers(
                         parent_null_bitmap,
-                        array.data().nulls(),
+                        array_data.nulls(),
                     );
 
                     for i in 0..array.num_columns() {
@@ -164,10 +165,10 @@ mod tests {
             Field::new("a", DataType::Int32, false),
             Field::new(
                 "b",
-                DataType::Struct(vec![
+                DataType::Struct(Fields::from(vec![
                     Field::new("c", DataType::Utf8, false),
                     Field::new("d", DataType::Int32, false),
-                ]),
+                ])),
                 false,
             ),
         ]));
@@ -192,10 +193,10 @@ mod tests {
             Field::new("a", DataType::Int32, false),
             Field::new(
                 "bee",
-                DataType::Struct(vec![
+                DataType::Struct(Fields::from(vec![
                     Field::new("c", DataType::Utf8, false),
                     Field::new("d", DataType::Int32, false),
-                ]),
+                ])),
                 false,
             ),
         ]));
@@ -212,10 +213,10 @@ mod tests {
             Field::new("a", DataType::Int32, false),
             Field::new(
                 "b",
-                DataType::Struct(vec![
+                DataType::Struct(Fields::from(vec![
                     Field::new("c", DataType::Utf8, false),
                     Field::new("d", DataType::Int32, false),
-                ]),
+                ])),
                 true,
             ),
         ]));

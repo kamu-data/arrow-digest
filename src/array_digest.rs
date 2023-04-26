@@ -35,8 +35,9 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
     }
 
     fn update(&mut self, array: &dyn Array, parent_null_bitmap: Option<&NullBuffer>) {
+        let array_data = array.to_data();
         let combined_null_bitmap_val =
-            crate::utils::maybe_combine_null_buffers(parent_null_bitmap, array.data().nulls());
+            crate::utils::maybe_combine_null_buffers(parent_null_bitmap, array_data.nulls());
         let combined_null_bitmap = combined_null_bitmap_val.as_option();
 
         let data_type = array.data_type();
@@ -110,7 +111,7 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
             DataType::Struct(_) => panic!(
                 "Structs are currently flattened by RecordDigest and cannot be processed by ArrayDigest"
             ),
-            DataType::Union(_, _, _) => unsupported(data_type),
+            DataType::Union(_, _) => unsupported(data_type),
             DataType::Dictionary(..) => unsupported(data_type),
             DataType::Decimal128(_, _) => self.hash_fixed_size(array, 16, combined_null_bitmap),
             DataType::Decimal256(_, _) => self.hash_fixed_size(array, 32, combined_null_bitmap),
@@ -135,17 +136,19 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
         item_size: usize,
         null_bitmap: Option<&NullBuffer>,
     ) {
+        let array_data = array.to_data();
+
         // Ensure single buffer
         assert_eq!(
-            array.data().buffers().len(),
+            array_data.buffers().len(),
             1,
             "Multiple buffers on a primitive type array"
         );
 
         let slice = {
-            let data_start = array.data().offset() * item_size;
-            let data_end = data_start + array.data().len() * item_size;
-            &array.data().buffers()[0].as_slice()[data_start..data_end]
+            let data_start = array_data.offset() * item_size;
+            let data_end = data_start + array_data.len() * item_size;
+            &array_data.buffers()[0].as_slice()[data_start..data_end]
         };
 
         match null_bitmap {
