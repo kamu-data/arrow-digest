@@ -177,8 +177,8 @@ mod tests {
         let c: Arc<dyn Array> = Arc::new(StringArray::from(vec!["a", "b", "c"]));
         let d: Arc<dyn Array> = Arc::new(Int32Array::from(vec![3, 2, 1]));
         let b = Arc::new(StructArray::from(vec![
-            (Field::new("c", DataType::Utf8, false), c.clone()),
-            (Field::new("d", DataType::Int32, false), d.clone()),
+            (Arc::new(Field::new("c", DataType::Utf8, false)), c.clone()),
+            (Arc::new(Field::new("d", DataType::Int32, false)), d.clone()),
         ]));
 
         let record_batch1 = RecordBatch::try_new(schema, vec![a.clone(), b.clone()]).unwrap();
@@ -223,8 +223,8 @@ mod tests {
 
         let b = Arc::new(StructArray::from((
             vec![
-                (Field::new("c", DataType::Utf8, false), c.clone()),
-                (Field::new("d", DataType::Int32, false), d.clone()),
+                (Arc::new(Field::new("c", DataType::Utf8, false)), c.clone()),
+                (Arc::new(Field::new("d", DataType::Int32, false)), d.clone()),
             ],
             Buffer::from([0b111]),
         )));
@@ -240,8 +240,8 @@ mod tests {
         // Nullability - not equal
         let b = Arc::new(StructArray::from((
             vec![
-                (Field::new("c", DataType::Utf8, false), c.clone()),
-                (Field::new("d", DataType::Int32, false), d.clone()),
+                (Arc::new(Field::new("c", DataType::Utf8, false)), c.clone()),
+                (Arc::new(Field::new("d", DataType::Int32, false)), d.clone()),
             ],
             Buffer::from([0b101]),
         )));
