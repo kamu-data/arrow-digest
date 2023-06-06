@@ -14,4 +14,4 @@ arrow = { version = "40", default-features = false }
 
 [dev-dependencies]
 sha3 = "0.10"
-parquet = { version = "40", default-features = false }
+parquet = { version = "41", default-features = false }
