@@ -10,7 +10,7 @@ license = "Apache-2.0"
 
 [dependencies]
 digest = "0.10"
-arrow = { version = "40", default-features = false }
+arrow = { version = "41", default-features = false }
 
 [dev-dependencies]
 sha3 = "0.10"
