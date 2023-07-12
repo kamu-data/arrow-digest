@@ -8,6 +8,9 @@ updates:
     directory: /
     schedule:
       interval: daily
+    groups:
+      all:
+        - "*"
     ignore:
       # For now we use dependabot to notify us only about major library updates
       - dependency-name: "*"
