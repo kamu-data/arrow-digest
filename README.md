@@ -64,6 +64,9 @@ While we're working towards `v1` we reserve the right to break the hash stabilit
 - [ ] Maps
 - [ ] Metadata endianness check
 - [ ] Better test coverage + fuzzing
+- [ ] Performance: Benchmarks
+- [ ] Performance: Parallelism
+- [ ] Performance: Code optimization
 
 ## Design Goals
 - Be reasonably fast
