@@ -8,10 +8,24 @@ keywords = ["arrow", "hash", "digest"]
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 license = "Apache-2.0"
 
+
 [dependencies]
 digest = "0.10"
 arrow = { version = "51", default-features = false }
 
+
 [dev-dependencies]
+criterion = "0.5"
+rand = { version = "0.8", features = ["small_rng"] }
+blake2 = "0.10"
+sha2 = "0.10"
 sha3 = "0.10"
-parquet = { version = "51", default-features = false }
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+tempfile = "3"
+tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread"] }
+parquet = { version = "51", default-features = false, features = ["arrow"] }
+
+
+[[bench]]
+name = "perf"
+harness = false
