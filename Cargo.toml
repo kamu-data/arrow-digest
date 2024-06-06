@@ -11,7 +11,7 @@ license = "Apache-2.0"
 
 [dependencies]
 digest = "0.10"
-arrow = { version = "51", default-features = false }
+arrow = { version = "52", default-features = false }
 
 
 [dev-dependencies]
@@ -23,7 +23,7 @@ sha3 = "0.10"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 tempfile = "3"
 tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread"] }
-parquet = { version = "51", default-features = false, features = ["arrow"] }
+parquet = { version = "52", default-features = false, features = ["arrow"] }
 
 
 [[bench]]
