@@ -106,7 +106,7 @@ fn bench_write_parquet(batch: &RecordBatch, out_path: &Path) {
         None,
     )
     .unwrap();
-    writer.write(&batch).unwrap();
+    writer.write(batch).unwrap();
     writer.close().unwrap();
 }
 

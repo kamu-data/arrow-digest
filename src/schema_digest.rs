@@ -33,8 +33,8 @@ pub(crate) enum TypeID {
 
 #[repr(u16)]
 pub(crate) enum DateUnitID {
-    DAY = 0,
-    MILLISECOND = 1,
+    Day = 0,
+    Millisecond = 1,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -64,106 +64,106 @@ impl From<&TimeUnit> for TimeUnitID {
 pub(crate) fn hash_data_type<Dig: Digest>(data_type: &DataType, hasher: &mut Dig) {
     match data_type {
         DataType::Null => {
-            hasher.update(&(TypeID::Null as u16).to_le_bytes());
+            hasher.update((TypeID::Null as u16).to_le_bytes());
         }
         DataType::Boolean => {
-            hasher.update(&(TypeID::Bool as u16).to_le_bytes());
+            hasher.update((TypeID::Bool as u16).to_le_bytes());
         }
         DataType::Int8 => {
-            hasher.update(&(TypeID::Int as u16).to_le_bytes());
-            hasher.update(&1u8.to_le_bytes());
-            hasher.update(&8u64.to_le_bytes());
+            hasher.update((TypeID::Int as u16).to_le_bytes());
+            hasher.update(1u8.to_le_bytes());
+            hasher.update(8u64.to_le_bytes());
         }
         DataType::Int16 => {
-            hasher.update(&(TypeID::Int as u16).to_le_bytes());
-            hasher.update(&1u8.to_le_bytes());
-            hasher.update(&16u64.to_le_bytes());
+            hasher.update((TypeID::Int as u16).to_le_bytes());
+            hasher.update(1u8.to_le_bytes());
+            hasher.update(16u64.to_le_bytes());
         }
         DataType::Int32 => {
-            hasher.update(&(TypeID::Int as u16).to_le_bytes());
-            hasher.update(&1u8.to_le_bytes());
-            hasher.update(&32u64.to_le_bytes());
+            hasher.update((TypeID::Int as u16).to_le_bytes());
+            hasher.update(1u8.to_le_bytes());
+            hasher.update(32u64.to_le_bytes());
         }
         DataType::Int64 => {
-            hasher.update(&(TypeID::Int as u16).to_le_bytes());
-            hasher.update(&1u8.to_le_bytes());
-            hasher.update(&64u64.to_le_bytes());
+            hasher.update((TypeID::Int as u16).to_le_bytes());
+            hasher.update(1u8.to_le_bytes());
+            hasher.update(64u64.to_le_bytes());
         }
         DataType::UInt8 => {
-            hasher.update(&(TypeID::Int as u16).to_le_bytes());
-            hasher.update(&0u8.to_le_bytes());
-            hasher.update(&8u64.to_le_bytes());
+            hasher.update((TypeID::Int as u16).to_le_bytes());
+            hasher.update(0u8.to_le_bytes());
+            hasher.update(8u64.to_le_bytes());
         }
         DataType::UInt16 => {
-            hasher.update(&(TypeID::Int as u16).to_le_bytes());
-            hasher.update(&0u8.to_le_bytes());
-            hasher.update(&16u64.to_le_bytes());
+            hasher.update((TypeID::Int as u16).to_le_bytes());
+            hasher.update(0u8.to_le_bytes());
+            hasher.update(16u64.to_le_bytes());
         }
         DataType::UInt32 => {
-            hasher.update(&(TypeID::Int as u16).to_le_bytes());
-            hasher.update(&0u8.to_le_bytes());
-            hasher.update(&32u64.to_le_bytes());
+            hasher.update((TypeID::Int as u16).to_le_bytes());
+            hasher.update(0u8.to_le_bytes());
+            hasher.update(32u64.to_le_bytes());
         }
         DataType::UInt64 => {
-            hasher.update(&(TypeID::Int as u16).to_le_bytes());
-            hasher.update(&0u8.to_le_bytes());
-            hasher.update(&64u64.to_le_bytes());
+            hasher.update((TypeID::Int as u16).to_le_bytes());
+            hasher.update(0u8.to_le_bytes());
+            hasher.update(64u64.to_le_bytes());
         }
         DataType::Float16 => {
-            hasher.update(&(TypeID::FloatingPoint as u16).to_le_bytes());
-            hasher.update(&16u64.to_le_bytes());
+            hasher.update((TypeID::FloatingPoint as u16).to_le_bytes());
+            hasher.update(16u64.to_le_bytes());
         }
         DataType::Float32 => {
-            hasher.update(&(TypeID::FloatingPoint as u16).to_le_bytes());
-            hasher.update(&32u64.to_le_bytes());
+            hasher.update((TypeID::FloatingPoint as u16).to_le_bytes());
+            hasher.update(32u64.to_le_bytes());
         }
         DataType::Float64 => {
-            hasher.update(&(TypeID::FloatingPoint as u16).to_le_bytes());
-            hasher.update(&64u64.to_le_bytes());
+            hasher.update((TypeID::FloatingPoint as u16).to_le_bytes());
+            hasher.update(64u64.to_le_bytes());
         }
         DataType::Timestamp(time_unit, time_zone) => {
-            hasher.update(&(TypeID::Timestamp as u16).to_le_bytes());
-            hasher.update(&(TimeUnitID::from(time_unit) as u16).to_le_bytes());
+            hasher.update((TypeID::Timestamp as u16).to_le_bytes());
+            hasher.update((TimeUnitID::from(time_unit) as u16).to_le_bytes());
             match time_zone {
-                None => hasher.update(&[0u8]),
+                None => hasher.update([0u8]),
                 Some(tz) => {
-                    hasher.update(&(tz.len() as u64).to_le_bytes());
+                    hasher.update((tz.len() as u64).to_le_bytes());
                     hasher.update(tz.as_bytes());
                 }
             }
         }
         DataType::Date32 => {
-            hasher.update(&(TypeID::Date as u16).to_le_bytes());
-            hasher.update(&32u64.to_le_bytes());
-            hasher.update(&(DateUnitID::DAY as u16).to_le_bytes());
+            hasher.update((TypeID::Date as u16).to_le_bytes());
+            hasher.update(32u64.to_le_bytes());
+            hasher.update((DateUnitID::Day as u16).to_le_bytes());
         }
         DataType::Date64 => {
-            hasher.update(&(TypeID::Date as u16).to_le_bytes());
-            hasher.update(&64u64.to_le_bytes());
-            hasher.update(&(DateUnitID::MILLISECOND as u16).to_le_bytes());
+            hasher.update((TypeID::Date as u16).to_le_bytes());
+            hasher.update(64u64.to_le_bytes());
+            hasher.update((DateUnitID::Millisecond as u16).to_le_bytes());
         }
         DataType::Time32(time_unit) => {
-            hasher.update(&(TypeID::Time as u16).to_le_bytes());
-            hasher.update(&32u64.to_le_bytes());
-            hasher.update(&(TimeUnitID::from(time_unit) as u16).to_le_bytes());
+            hasher.update((TypeID::Time as u16).to_le_bytes());
+            hasher.update(32u64.to_le_bytes());
+            hasher.update((TimeUnitID::from(time_unit) as u16).to_le_bytes());
         }
         DataType::Time64(time_unit) => {
-            hasher.update(&(TypeID::Time as u16).to_le_bytes());
-            hasher.update(&64u64.to_le_bytes());
-            hasher.update(&(TimeUnitID::from(time_unit) as u16).to_le_bytes());
+            hasher.update((TypeID::Time as u16).to_le_bytes());
+            hasher.update(64u64.to_le_bytes());
+            hasher.update((TimeUnitID::from(time_unit) as u16).to_le_bytes());
         }
         DataType::Duration(_) => unimplemented!(),
         DataType::Interval(_) => unimplemented!(),
         DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => {
-            hasher.update(&(TypeID::Binary as u16).to_le_bytes());
+            hasher.update((TypeID::Binary as u16).to_le_bytes());
         }
         DataType::BinaryView => unimplemented!(),
         DataType::Utf8 | DataType::LargeUtf8 => {
-            hasher.update(&(TypeID::Utf8 as u16).to_le_bytes());
+            hasher.update((TypeID::Utf8 as u16).to_le_bytes());
         }
         DataType::Utf8View => unimplemented!(),
         DataType::List(field) | DataType::FixedSizeList(field, _) | DataType::LargeList(field) => {
-            hasher.update(&(TypeID::List as u16).to_le_bytes());
+            hasher.update((TypeID::List as u16).to_le_bytes());
             hash_data_type(field.data_type(), hasher);
         }
         DataType::ListView(_) | DataType::LargeListView(_) => unimplemented!(),
@@ -171,16 +171,16 @@ pub(crate) fn hash_data_type<Dig: Digest>(data_type: &DataType, hasher: &mut Dig
         DataType::Union(_, _) => unimplemented!(),
         DataType::Dictionary(..) => unimplemented!(),
         DataType::Decimal128(p, s) => {
-            hasher.update(&(TypeID::Decimal as u16).to_le_bytes());
-            hasher.update(&128u64.to_le_bytes());
-            hasher.update(&(*p as u64).to_le_bytes());
-            hasher.update(&(*s as u64).to_le_bytes());
+            hasher.update((TypeID::Decimal as u16).to_le_bytes());
+            hasher.update(128u64.to_le_bytes());
+            hasher.update((*p as u64).to_le_bytes());
+            hasher.update((*s as u64).to_le_bytes());
         }
         DataType::Decimal256(p, s) => {
-            hasher.update(&(TypeID::Decimal as u16).to_le_bytes());
-            hasher.update(&256u64.to_le_bytes());
-            hasher.update(&(*p as u64).to_le_bytes());
-            hasher.update(&(*s as u64).to_le_bytes());
+            hasher.update((TypeID::Decimal as u16).to_le_bytes());
+            hasher.update(256u64.to_le_bytes());
+            hasher.update((*p as u64).to_le_bytes());
+            hasher.update((*s as u64).to_le_bytes());
         }
         DataType::Map(..) => unimplemented!(),
         DataType::RunEndEncoded(..) => unimplemented!(),

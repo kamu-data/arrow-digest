@@ -32,9 +32,9 @@ impl<Dig: Digest> RecordDigest for RecordDigestV0<Dig> {
         let mut columns = Vec::new();
 
         Self::walk_nested_fields(schema.fields(), 0, &mut |field, level| {
-            hasher.update(&(field.name().len() as u64).to_le_bytes());
+            hasher.update((field.name().len() as u64).to_le_bytes());
             hasher.update(field.name().as_bytes());
-            hasher.update(&(level as u64).to_le_bytes());
+            hasher.update((level as u64).to_le_bytes());
 
             match field.data_type() {
                 DataType::Struct(_) => (),
@@ -68,7 +68,7 @@ impl<Dig: Digest> RecordDigest for RecordDigestV0<Dig> {
 }
 
 impl<Dig: Digest> RecordDigestV0<Dig> {
-    fn walk_nested_fields<'a>(fields: &Fields, level: usize, fun: &mut impl FnMut(&Field, usize)) {
+    fn walk_nested_fields(fields: &Fields, level: usize, fun: &mut impl FnMut(&Field, usize)) {
         for field in fields {
             match field.data_type() {
                 DataType::Struct(nested_fields) => {
@@ -104,7 +104,7 @@ impl<Dig: Digest> RecordDigestV0<Dig> {
                         );
                     }
                 }
-                _ => fun(array, parent_null_bitmap.clone()),
+                _ => fun(array, parent_null_bitmap),
             }
         }
     }

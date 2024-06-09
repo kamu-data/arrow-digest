@@ -166,7 +166,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
                         let pos = i * item_size;
                         self.hasher.update(&slice[pos..pos + item_size]);
                     } else {
-                        self.hasher.update(&Self::NULL_MARKER);
+                        self.hasher.update(Self::NULL_MARKER);
                     }
                 }
             }
@@ -182,7 +182,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
                 for i in 0..bool_array.len() {
                     // Safety: boundary check is right above
                     let value = unsafe { bool_array.value_unchecked(i) };
-                    self.hasher.update(&[value as u8 + 1]);
+                    self.hasher.update([value as u8 + 1]);
                 }
             }
             Some(null_bitmap) => {
@@ -190,9 +190,9 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
                     if null_bitmap.is_valid(i) {
                         // Safety: boundary check is right above
                         let value = unsafe { bool_array.value_unchecked(i) };
-                        self.hasher.update(&[value as u8 + 1]);
+                        self.hasher.update([value as u8 + 1]);
                     } else {
-                        self.hasher.update(&Self::NULL_MARKER);
+                        self.hasher.update(Self::NULL_MARKER);
                     }
                 }
             }
@@ -208,7 +208,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
             None => {
                 for i in 0..array.len() {
                     let s = array.value(i);
-                    self.hasher.update(&(s.len() as u64).to_le_bytes());
+                    self.hasher.update((s.len() as u64).to_le_bytes());
                     self.hasher.update(s.as_bytes());
                 }
             }
@@ -216,10 +216,10 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
                 for i in 0..array.len() {
                     if null_bitmap.is_valid(i) {
                         let s = array.value(i);
-                        self.hasher.update(&(s.len() as u64).to_le_bytes());
+                        self.hasher.update((s.len() as u64).to_le_bytes());
                         self.hasher.update(s.as_bytes());
                     } else {
-                        self.hasher.update(&Self::NULL_MARKER);
+                        self.hasher.update(Self::NULL_MARKER);
                     }
                 }
             }
@@ -235,7 +235,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
             None => {
                 for i in 0..array.len() {
                     let slice = array.value(i);
-                    self.hasher.update(&(slice.len() as u64).to_le_bytes());
+                    self.hasher.update((slice.len() as u64).to_le_bytes());
                     self.hasher.update(slice);
                 }
             }
@@ -243,10 +243,10 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
                 for i in 0..array.len() {
                     if null_bitmap.is_valid(i) {
                         let slice = array.value(i);
-                        self.hasher.update(&(slice.len() as u64).to_le_bytes());
+                        self.hasher.update((slice.len() as u64).to_le_bytes());
                         self.hasher.update(slice);
                     } else {
-                        self.hasher.update(&Self::NULL_MARKER);
+                        self.hasher.update(Self::NULL_MARKER);
                     }
                 }
             }
@@ -263,7 +263,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
             None => {
                 for i in 0..array.len() {
                     let slice = array.value(i);
-                    self.hasher.update(&(size as u64).to_le_bytes());
+                    self.hasher.update((size as u64).to_le_bytes());
                     self.hasher.update(slice);
                 }
             }
@@ -271,10 +271,10 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
                 for i in 0..array.len() {
                     if null_bitmap.is_valid(i) {
                         let slice = array.value(i);
-                        self.hasher.update(&(size as u64).to_le_bytes());
+                        self.hasher.update((size as u64).to_le_bytes());
                         self.hasher.update(slice);
                     } else {
-                        self.hasher.update(&Self::NULL_MARKER);
+                        self.hasher.update(Self::NULL_MARKER);
                     }
                 }
             }
@@ -290,7 +290,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
             None => {
                 for i in 0..array.len() {
                     let sub_array = array.value(i);
-                    self.hasher.update(&(sub_array.len() as u64).to_le_bytes());
+                    self.hasher.update((sub_array.len() as u64).to_le_bytes());
                     self.update(sub_array.as_ref(), None);
                 }
             }
@@ -298,10 +298,10 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
                 for i in 0..array.len() {
                     if null_bitmap.is_valid(i) {
                         let sub_array = array.value(i);
-                        self.hasher.update(&(sub_array.len() as u64).to_le_bytes());
+                        self.hasher.update((sub_array.len() as u64).to_le_bytes());
                         self.update(sub_array.as_ref(), None);
                     } else {
-                        self.hasher.update(&Self::NULL_MARKER);
+                        self.hasher.update(Self::NULL_MARKER);
                     }
                 }
             }
@@ -317,7 +317,7 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
             None => {
                 for i in 0..array.len() {
                     let sub_array = array.value(i);
-                    self.hasher.update(&(sub_array.len() as u64).to_le_bytes());
+                    self.hasher.update((sub_array.len() as u64).to_le_bytes());
                     self.update(sub_array.as_ref(), None);
                 }
             }
@@ -325,10 +325,10 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
                 for i in 0..array.len() {
                     if null_bitmap.is_valid(i) {
                         let sub_array = array.value(i);
-                        self.hasher.update(&(sub_array.len() as u64).to_le_bytes());
+                        self.hasher.update((sub_array.len() as u64).to_le_bytes());
                         self.update(sub_array.as_ref(), None);
                     } else {
-                        self.hasher.update(&Self::NULL_MARKER);
+                        self.hasher.update(Self::NULL_MARKER);
                     }
                 }
             }
