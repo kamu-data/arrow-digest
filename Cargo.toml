@@ -1,6 +1,6 @@
 [package]
 name = "arrow-digest"
-version = "51.0.0"
+version = "52.0.0"
 edition = "2021"
 repository = "https://github.com/sergiimk/arrow-digest"
 description = "Stable hashes for Apache Arrow."
@@ -11,7 +11,7 @@ license = "Apache-2.0"
 
 [dependencies]
 digest = "0.10"
-arrow = { version = "51", default-features = false }
+arrow = { version = "52", default-features = false }
 
 
 [dev-dependencies]
@@ -22,8 +22,11 @@ sha2 = "0.10"
 sha3 = "0.10"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 tempfile = "3"
-tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread"] }
-parquet = { version = "51", default-features = false, features = ["arrow"] }
+tokio = { version = "1", default-features = false, features = [
+    "rt",
+    "rt-multi-thread",
+] }
+parquet = { version = "52", default-features = false, features = ["arrow"] }
 
 
 [[bench]]
