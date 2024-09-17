@@ -389,10 +389,10 @@ mod tests {
         fn make_bool_array(data: Vec<u8>, len: usize, nulls: Option<Vec<u8>>) -> BooleanArray {
             let builder = ArrayData::builder(DataType::Boolean)
                 .len(len)
-                .add_buffer(Buffer::from(data));
+                .add_buffer(Buffer::from_vec(data));
 
             let builder = if let Some(nulls) = nulls {
-                builder.null_bit_buffer(Some(Buffer::from(nulls)))
+                builder.null_bit_buffer(Some(Buffer::from_vec(nulls)))
             } else {
                 builder
             };
