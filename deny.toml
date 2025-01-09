@@ -1,0 +1,35 @@
+[bans]
+# Forbid multiple versions of same dependency (with some exceptions)
+multiple-versions = "deny"
+# We should slways specify version ranges
+wildcards = "deny"
+# We specify features explicitly to avoid bloat
+workspace-default-features = "deny"
+# Avoid adding dependencies to this list as this slows down compilation.
+# Find another ways to avoid duplication.
+skip-tree = []
+deny = [{ name = "openssl" }]
+
+
+[licenses]
+allow = [
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "MIT",
+    "Unicode-3.0",
+    "Unlicense",
+]
+private = { ignore = true }
+
+
+[sources]
+unknown-git = "deny"
+unknown-registry = "deny"
+allow-org = { github = [] }
+
+
+[advisories]
+yanked = "deny"
+ignore = []
