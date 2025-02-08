@@ -154,14 +154,15 @@ pub(crate) fn hash_data_type<Dig: Digest>(data_type: &DataType, hasher: &mut Dig
         }
         DataType::Duration(_) => unimplemented!(),
         DataType::Interval(_) => unimplemented!(),
-        DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => {
+        DataType::Binary
+        | DataType::FixedSizeBinary(_)
+        | DataType::LargeBinary
+        | DataType::BinaryView => {
             hasher.update((TypeID::Binary as u16).to_le_bytes());
         }
-        DataType::BinaryView => unimplemented!(),
-        DataType::Utf8 | DataType::LargeUtf8 => {
+        DataType::Utf8 | DataType::LargeUtf8 | DataType::Utf8View => {
             hasher.update((TypeID::Utf8 as u16).to_le_bytes());
         }
-        DataType::Utf8View => unimplemented!(),
         DataType::List(field) | DataType::FixedSizeList(field, _) | DataType::LargeList(field) => {
             hasher.update((TypeID::List as u16).to_le_bytes());
             hash_data_type(field.data_type(), hasher);

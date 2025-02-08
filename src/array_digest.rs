@@ -1,9 +1,10 @@
 use crate::ArrayDigest;
 use arrow::{
     array::{
-        Array, BinaryArray, BooleanArray, FixedSizeBinaryArray, FixedSizeListArray,
-        GenericBinaryArray, GenericListArray, GenericStringArray, LargeBinaryArray, LargeListArray,
-        LargeStringArray, ListArray, OffsetSizeTrait, StringArray,
+        Array, BinaryArray, BinaryViewArray, BooleanArray, FixedSizeBinaryArray,
+        FixedSizeListArray, GenericBinaryArray, GenericListArray, GenericStringArray,
+        LargeBinaryArray, LargeListArray, LargeStringArray, ListArray, OffsetSizeTrait,
+        StringArray, StringViewArray,
     },
     buffer::NullBuffer,
     datatypes::DataType,
@@ -76,10 +77,13 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
                 array.as_any().downcast_ref::<BinaryArray>().unwrap(),
                 combined_null_bitmap,
             ),
-            DataType::BinaryView => unsupported(data_type),
             DataType::LargeBinary => self.hash_array_binary(
                 array.as_any().downcast_ref::<LargeBinaryArray>().unwrap(),
                 combined_null_bitmap,
+            ),
+            DataType::BinaryView => self.hash_array_binary_view(
+                array.as_any().downcast_ref::<BinaryViewArray>().unwrap(),
+                combined_null_bitmap
             ),
             DataType::FixedSizeBinary(size) => {
                 self.hash_array_binary_fixed(
@@ -92,10 +96,13 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
                 array.as_any().downcast_ref::<StringArray>().unwrap(),
                 combined_null_bitmap,
             ),
-            DataType::Utf8View => unsupported(data_type),
             DataType::LargeUtf8 => self.hash_array_string(
                 array.as_any().downcast_ref::<LargeStringArray>().unwrap(),
                 combined_null_bitmap,
+            ),
+            DataType::Utf8View => self.hash_array_string_view(
+                array.as_any().downcast_ref::<StringViewArray>().unwrap(),
+                combined_null_bitmap
             ),
             DataType::List(_) => self.hash_array_list(
                 array.as_any().downcast_ref::<ListArray>().unwrap(),
@@ -226,9 +233,63 @@ impl<Dig: Digest> ArrayDigestV0<Dig> {
         }
     }
 
+    fn hash_array_string_view(
+        &mut self,
+        array: &StringViewArray,
+        null_bitmap: Option<&NullBuffer>,
+    ) {
+        match null_bitmap {
+            None => {
+                for i in 0..array.len() {
+                    let s = array.value(i);
+                    self.hasher.update((s.len() as u64).to_le_bytes());
+                    self.hasher.update(s.as_bytes());
+                }
+            }
+            Some(null_bitmap) => {
+                for i in 0..array.len() {
+                    if null_bitmap.is_valid(i) {
+                        let s = array.value(i);
+                        self.hasher.update((s.len() as u64).to_le_bytes());
+                        self.hasher.update(s.as_bytes());
+                    } else {
+                        self.hasher.update(Self::NULL_MARKER);
+                    }
+                }
+            }
+        }
+    }
+
     fn hash_array_binary<OffsetSize: OffsetSizeTrait>(
         &mut self,
         array: &GenericBinaryArray<OffsetSize>,
+        null_bitmap: Option<&NullBuffer>,
+    ) {
+        match null_bitmap {
+            None => {
+                for i in 0..array.len() {
+                    let slice = array.value(i);
+                    self.hasher.update((slice.len() as u64).to_le_bytes());
+                    self.hasher.update(slice);
+                }
+            }
+            Some(null_bitmap) => {
+                for i in 0..array.len() {
+                    if null_bitmap.is_valid(i) {
+                        let slice = array.value(i);
+                        self.hasher.update((slice.len() as u64).to_le_bytes());
+                        self.hasher.update(slice);
+                    } else {
+                        self.hasher.update(Self::NULL_MARKER);
+                    }
+                }
+            }
+        }
+    }
+
+    fn hash_array_binary_view(
+        &mut self,
+        array: &BinaryViewArray,
         null_bitmap: Option<&NullBuffer>,
     ) {
         match null_bitmap {
@@ -474,6 +535,14 @@ mod tests {
                 Some("baz")
             ]),),
         );
+
+        // View
+        assert_eq!(
+            ArrayDigestV0::<Sha3_256>::digest(&StringViewArray::from_iter_values(vec![
+                "foo", "bar", "baz"
+            ])),
+            ArrayDigestV0::<Sha3_256>::digest(&StringArray::from(vec!["foo", "bar", "baz"])),
+        );
     }
 
     #[test]
@@ -616,6 +685,19 @@ mod tests {
                     .build()
                     .unwrap()
             )),
+        );
+
+        // View
+        assert_eq!(
+            ArrayDigestV0::<Sha3_256>::digest(&BinaryViewArray::from_iter_values(vec![
+                b"one" as &[u8],
+                b"two",
+                b"",
+                b"three"
+            ])),
+            ArrayDigestV0::<Sha3_256>::digest(&BinaryArray::from_vec(vec![
+                b"one", b"two", b"", b"three"
+            ])),
         );
     }
 }
