@@ -16,7 +16,7 @@ arrow = { version = "54", default-features = false }
 
 [dev-dependencies]
 criterion = "0.5"
-rand = { version = "0.8", features = ["small_rng"] }
+rand = { version = "0.9", features = ["small_rng"] }
 blake2 = "0.10"
 sha2 = "0.10"
 sha3 = "0.10"
