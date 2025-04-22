@@ -28,7 +28,7 @@ fn setup_batch(params: &Params) -> RecordBatch {
         let mut b = array::PrimitiveBuilder::<Int64Type>::with_capacity(params.num_records);
 
         let mut buf = vec![0; params.num_records];
-        rng.try_fill(&mut buf[..]).unwrap();
+        rng.fill(&mut buf[..]);
         b.append_slice(&buf[..]);
 
         columns.push(Arc::new(b.finish()));
@@ -54,10 +54,10 @@ fn setup_batch_nullable(params: &Params) -> RecordBatch {
         let mut b = array::PrimitiveBuilder::<Int64Type>::with_capacity(params.num_records);
 
         for _ in 0..params.num_records {
-            if rng.gen_bool(0.5) {
+            if rng.random_bool(0.5) {
                 b.append_null()
             } else {
-                b.append_value(rng.gen())
+                b.append_value(rng.random())
             }
         }
 
@@ -80,7 +80,7 @@ fn setup_batch_nullable(params: &Params) -> RecordBatch {
 fn setup_flat_data(params: &Params) -> Vec<u8> {
     let mut rng = rand::rngs::SmallRng::seed_from_u64(123_456);
     let mut buf = vec![0; params.total_bytes_to_hash()];
-    rng.try_fill(&mut buf[..]).unwrap();
+    rng.fill(&mut buf[..]);
     buf
 }
 

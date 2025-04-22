@@ -32,4 +32,8 @@ allow-org = { github = [] }
 
 [advisories]
 yanked = "deny"
-ignore = []
+ignore = [
+    # paste is unmaintained (via parquet)
+    # See: https://rustsec.org/advisories/RUSTSEC-2024-0436
+    "RUSTSEC-2024-0436",
+]
