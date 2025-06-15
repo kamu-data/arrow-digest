@@ -6,8 +6,12 @@ wildcards = "deny"
 # We specify features explicitly to avoid bloat
 workspace-default-features = "deny"
 # Avoid adding dependencies to this list as this slows down compilation.
-# Find another ways to avoid duplication.
-skip-tree = []
+skip-tree = [
+    # TODO: Likely an issue in ahash dependency tree
+    "getrandom",
+    "wasi",
+]
+# Find another ways to avoid duplication
 deny = [{ name = "openssl" }]
 
 
