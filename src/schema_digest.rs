@@ -171,6 +171,18 @@ pub(crate) fn hash_data_type<Dig: Digest>(data_type: &DataType, hasher: &mut Dig
         DataType::Struct(_) => unimplemented!(),
         DataType::Union(_, _) => unimplemented!(),
         DataType::Dictionary(..) => unimplemented!(),
+        DataType::Decimal32(p, s) => {
+            hasher.update((TypeID::Decimal as u16).to_le_bytes());
+            hasher.update(32u64.to_le_bytes());
+            hasher.update((*p as u64).to_le_bytes());
+            hasher.update((*s as u64).to_le_bytes());
+        }
+        DataType::Decimal64(p, s) => {
+            hasher.update((TypeID::Decimal as u16).to_le_bytes());
+            hasher.update(64u64.to_le_bytes());
+            hasher.update((*p as u64).to_le_bytes());
+            hasher.update((*s as u64).to_le_bytes());
+        }
         DataType::Decimal128(p, s) => {
             hasher.update((TypeID::Decimal as u16).to_le_bytes());
             hasher.update(128u64.to_le_bytes());

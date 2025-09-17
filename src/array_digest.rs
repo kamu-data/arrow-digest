@@ -123,6 +123,8 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
             ),
             DataType::Union(_, _) => unsupported(data_type),
             DataType::Dictionary(..) => unsupported(data_type),
+            DataType::Decimal32(_, _) => self.hash_fixed_size(array, 4, combined_null_bitmap),
+            DataType::Decimal64(_, _) => self.hash_fixed_size(array, 8, combined_null_bitmap),
             DataType::Decimal128(_, _) => self.hash_fixed_size(array, 16, combined_null_bitmap),
             DataType::Decimal256(_, _) => self.hash_fixed_size(array, 32, combined_null_bitmap),
             DataType::Map(..) => unsupported(data_type),
