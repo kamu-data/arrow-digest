@@ -83,15 +83,16 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
             ),
             DataType::BinaryView => self.hash_array_binary_view(
                 array.as_any().downcast_ref::<BinaryViewArray>().unwrap(),
-                combined_null_bitmap
+                combined_null_bitmap,
             ),
-            DataType::FixedSizeBinary(size) => {
-                self.hash_array_binary_fixed(
-                    array.as_any().downcast_ref::<FixedSizeBinaryArray>().unwrap(),
-                    *size as usize,
-                    combined_null_bitmap,
-                )
-            },
+            DataType::FixedSizeBinary(size) => self.hash_array_binary_fixed(
+                array
+                    .as_any()
+                    .downcast_ref::<FixedSizeBinaryArray>()
+                    .unwrap(),
+                *size as usize,
+                combined_null_bitmap,
+            ),
             DataType::Utf8 => self.hash_array_string(
                 array.as_any().downcast_ref::<StringArray>().unwrap(),
                 combined_null_bitmap,
@@ -102,7 +103,7 @@ impl<Dig: Digest> ArrayDigest for ArrayDigestV0<Dig> {
             ),
             DataType::Utf8View => self.hash_array_string_view(
                 array.as_any().downcast_ref::<StringViewArray>().unwrap(),
-                combined_null_bitmap
+                combined_null_bitmap,
             ),
             DataType::List(_) => self.hash_array_list(
                 array.as_any().downcast_ref::<ListArray>().unwrap(),

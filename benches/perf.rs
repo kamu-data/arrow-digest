@@ -14,7 +14,7 @@ use std::sync::Arc;
 use arrow::array;
 use arrow::datatypes::{DataType, Field, Int64Type, Schema};
 use arrow::record_batch::RecordBatch;
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use rand::{Rng, SeedableRng};
 
 ///////////////////////////////////////////////////////////////////////////////

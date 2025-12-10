@@ -1,4 +1,4 @@
-use arrow::buffer::{buffer_bin_or, BooleanBuffer, NullBuffer};
+use arrow::buffer::{BooleanBuffer, NullBuffer, buffer_bin_or};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
