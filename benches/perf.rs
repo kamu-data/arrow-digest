@@ -151,7 +151,7 @@ impl Params {
     fn total_bytes_to_hash(&self) -> usize {
         self.num_records * self.num_columns * std::mem::size_of::<i64>()
             + (self.num_records * self.num_columns) / 8
-            + if (self.num_records * self.num_columns) % 8 != 0 {
+            + if !(self.num_records * self.num_columns).is_multiple_of(8) {
                 1
             } else {
                 0
