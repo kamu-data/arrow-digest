@@ -15,7 +15,7 @@ use arrow::array;
 use arrow::datatypes::{DataType, Field, Int64Type, Schema};
 use arrow::record_batch::RecordBatch;
 use criterion::{Criterion, criterion_group, criterion_main};
-use rand::{Rng, SeedableRng};
+use rand::{RngExt as _, SeedableRng};
 
 ///////////////////////////////////////////////////////////////////////////////
 
