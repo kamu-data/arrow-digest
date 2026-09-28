@@ -10,6 +10,7 @@ skip-tree = [
     # TODO: Likely an issue in ahash dependency tree
     "getrandom",
     "wasi",
+    "syn",
 ]
 # Find another ways to avoid duplication
 deny = [{ name = "openssl" }]
@@ -36,8 +37,4 @@ allow-org = { github = [] }
 
 [advisories]
 yanked = "deny"
-ignore = [
-    # paste is unmaintained (via parquet)
-    # See: https://rustsec.org/advisories/RUSTSEC-2024-0436
-    "RUSTSEC-2024-0436",
-]
+ignore = []
