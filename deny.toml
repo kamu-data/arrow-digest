@@ -6,12 +6,12 @@ wildcards = "deny"
 # We specify features explicitly to avoid bloat
 workspace-default-features = "deny"
 # Avoid adding dependencies to this list as this slows down compilation.
+# Find another ways to avoid duplication
 skip-tree = [
-    # TODO: Likely an issue in ahash dependency tree
     "getrandom",
+    "syn",
     "wasi",
 ]
-# Find another ways to avoid duplication
 deny = [{ name = "openssl" }]
 
 
@@ -19,7 +19,6 @@ deny = [{ name = "openssl" }]
 allow = [
     "Apache-2.0",
     "BSD-2-Clause",
-    "BSD-3-Clause",
     "CC0-1.0",
     "MIT",
     "Unicode-3.0",
@@ -36,8 +35,4 @@ allow-org = { github = [] }
 
 [advisories]
 yanked = "deny"
-ignore = [
-    # paste is unmaintained (via parquet)
-    # See: https://rustsec.org/advisories/RUSTSEC-2024-0436
-    "RUSTSEC-2024-0436",
-]
+ignore = []
